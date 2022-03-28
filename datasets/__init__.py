@@ -21,14 +21,17 @@ def get_dataset_class(args):
         raise ValueError(f'dataset {args.dataset_file} not supported')
 
 
-def get_coco_api_from_dataset(dataset):
+def get_coco_api_from_dataset(dataset_val):
     for _ in range(10):
         # if isinstance(dataset, torchvision.datasets.CocoDetection):
         #     break
-        if isinstance(dataset, torch.utils.data.Subset):
-            dataset = dataset.dataset
-    if isinstance(dataset, torchvision.datasets.CocoDetection):
-        return dataset.coco
+        if isinstance(dataset_val, torch.utils.data.Subset):
+            dataset_val = dataset_val.dataset
+        
+    if isinstance(dataset_val, torchvision.datasets.CocoDetection):
+        return dataset_val.coco
+    elif isinstance(dataset_val, torchvision.datasets.Kitti):
+        return dataset_val.coco_labels
 
 
 def build_dataset(image_set, args):
@@ -45,5 +48,21 @@ def build_dataset(image_set, args):
     elif args.dataset_file == 'kitti':
         from .kitti import build as build_kitti
         return build_kitti(image_set, args)
+    else:
+        raise ValueError(f'dataset {args.dataset_file} not supported')
+
+
+
+def build_evaluator(args, postprocessors, dataset_val):
+    
+    if args.dataset_file == 'coco':
+        from .coco_eval import CocoEvaluator
+        iou_types = tuple(k for k in ('segm', 'bbox') if k in postprocessors.keys())
+        coco_evaluator = CocoEvaluator(base_ds, iou_types)
+        # coco_evaluator.coco_eval[iou_types[0]].params.iouThrs = [0, 0.1, 0.5, 0.75]
+    elif args.dataset_file == 'kitti':
+        from .kitti_eval import KittiEvaluator
+        iou_types = tuple(k for k in ('segm', 'bbox') if k in postprocessors.keys())
+        return KittiEvaluator(dataset_val, iou_types)
     else:
         raise ValueError(f'dataset {args.dataset_file} not supported')

@@ -4,6 +4,8 @@ import datetime
 import json
 import random
 import time
+import wandb
+import datetime
 from pathlib import Path
 
 import numpy as np
@@ -12,8 +14,8 @@ from torch.utils.data import DataLoader, DistributedSampler
 
 import datasets
 import util.misc as utils
-from datasets import build_dataset, get_dataset_class #, get_coco_api_from_dataset
-from engine import evaluate, train_one_epoch
+from datasets import build_dataset, get_dataset_class, get_coco_api_from_dataset#, build_evaluator
+from engine import evaluate, train_one_epoch#, my_evaluate
 from models import build_model
 import ipdb
 
@@ -104,16 +106,31 @@ def get_args_parser():
     parser.add_argument('--world_size', default=1, type=int,
                         help='number of distributed processes')
     parser.add_argument('--dist_url', default='env://', help='url used to set up distributed training')
+    
+    parser.add_argument('--use_wandb', action='store_true',
+                        help="Use wandb to log stats")
     return parser
 
-
+    
 def main(args):
+    
+    
     utils.init_distributed_mode(args)
     print("git:\n  {}\n".format(utils.get_sha()))
 
     if args.frozen_weights is not None:
         assert args.masks, "Frozen training is meant for segmentation only"
     print(args)
+    
+
+    if args.use_wandb:
+        ct = datetime.datetime.now()
+        wandb.init(
+            project="label-translation-detr-kitti", 
+            entity="andrew-liao", 
+            name=f"{ct.year}.{ct.month}.{ct.day}.{ct.hour}.{ct.minute}.{ct.second}", 
+            config=args
+        )
 
     device = torch.device(args.device)
 
@@ -169,15 +186,14 @@ def main(args):
                                  collate_fn=utils.collate_fn, 
                                  num_workers=args.num_workers)
 
+    
 
-    '''
     if args.dataset_file == "coco_panoptic":
         # We also evaluate AP during panoptic training, on original coco DS
         coco_val = datasets.coco.build("val", args)
         base_ds = get_coco_api_from_dataset(coco_val)
     else:
         base_ds = get_coco_api_from_dataset(dataset_val)
-    '''
     
     if args.frozen_weights is not None:
         checkpoint = torch.load(args.frozen_weights, map_location='cpu')
@@ -200,14 +216,13 @@ def main(args):
             args.start_epoch = checkpoint['epoch'] + 1
 
     
-    '''
     if args.eval:
         test_stats, coco_evaluator = evaluate(model, criterion, postprocessors,
                                               data_loader_val, base_ds, device, args.output_dir)
         if args.output_dir:
             utils.save_on_master(coco_evaluator.coco_eval["bbox"].eval, output_dir / "eval.pth")
         return
-    '''
+    
     
     print("Start training")
     start_time = time.time()
@@ -220,6 +235,9 @@ def main(args):
             model, criterion, data_loader_train, optimizer, device, epoch,
             args.clip_max_norm)
         lr_scheduler.step()
+        
+        
+
         if args.output_dir:
             checkpoint_paths = [output_dir / 'checkpoint.pth']
             # extra checkpoint before LR drop and every 100 epochs
@@ -235,20 +253,21 @@ def main(args):
                 }, checkpoint_path)
 
         
-        
-        test_stats = evaluate(
-            model, criterion, postprocessors, data_loader_val, device, args.output_dir)
+        test_stats, coco_evaluator = evaluate(
+            model, criterion, postprocessors, data_loader_val, base_ds, device, args.output_dir
+        )
 
-        ipdb.set_trace()
-        #test_stats, coco_evaluator = evaluate_coco(
-        #    model, criterion, postprocessors, data_loader_val, base_ds, device, args.output_dir
-        #)
-
-        log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
-                     **{f'test_{k}': v for k, v in test_stats.items()},
+        log_stats = {**{f'train/{k}': v for k, v in train_stats.items()},
+                     **{f'test/{k}': v for k, v in test_stats.items()},
                      'epoch': epoch,
                      'n_parameters': n_parameters}
 
+        ipdb.set_trace()
+        if args.use_wandb and utils.is_main_process():
+            wandb.log(log_stats)
+            wandb.watch(model)
+            
+        
         if args.output_dir and utils.is_main_process():
             with (output_dir / "log.txt").open("a") as f:
                 f.write(json.dumps(log_stats) + "\n")
@@ -263,6 +282,7 @@ def main(args):
                     for name in filenames:
                         torch.save(coco_evaluator.coco_eval["bbox"].eval,
                                    output_dir / "eval" / name)
+
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))

@@ -2,12 +2,15 @@
 Refer here kitti labels: https://github.com/bostondiditeam/kitti/blob/master/resources/devkit_object/readme.txt
 """
 import os
+import os.path as osp
+import json
 from pathlib import Path
 
 import torch
 from torch.utils.data import random_split
 import torchvision
 
+from pycocotools.coco import COCO
 import datasets.transforms as T
 import ipdb
 
@@ -63,37 +66,29 @@ class KittiDetection(torchvision.datasets.Kitti):
     
     def __init__(self, root, image_set, transforms):
         super(KittiDetection, self).__init__(root=root, train=image_set == "train")
+        self.coco_labels = COCO(osp.join(root, "Kitti/raw/training/labels_iscrowd.json"))
+        
+        labels = json.load(open(osp.join(root, "Kitti/raw/training/labels_iscrowd.json")))
+        self.filename_to_id = {}
+        for i in labels["images"]:
+            self.filename_to_id[i["file_name"]] = i["id"]
+            
         self._transforms = transforms
         self.prepare = PrepareKitti()
-        #self.prepare = ConvertCocoPolysToMask(return_masks)
-
+    
     @property
     def _raw_folder(self):
         return os.path.join(self.root, "Kitti", "raw")
     
-    @staticmethod
-    def to_coco_format(target):
-        new_target = []
-        for t in target:
-            category_id = KittiDetection._type_to_category_id(t["type"])
-            left, top, right, bottom = t["bbox"]
-            x_top_left, y_top_left, width, height = left, top, right - left,  bottom - top
-            new_target.append({
-                "category_id": category_id, 
-                "bbox": [x_top_left, y_top_left, width, height]
-            })
-        return new_target
-
     def __getitem__(self, idx):
         img, target = super(KittiDetection, self).__getitem__(idx)
         
         img_path = self.images[idx]
-        img_id = int(Path(img_path).stem)
+        filename = Path(img_path).name
+        img_id = self.filename_to_id[filename]
+        
         img, target = self.prepare(img, {"image_id": img_id, "annotations": target})
 
-        #image_id = self.ids[idx]
-        #target = {'image_id': image_id, 'annotations': target}
-        #img, target = self.prepare(img, target)
         if self._transforms is not None:
             img, target = self._transforms(img, target)
             

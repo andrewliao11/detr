@@ -69,8 +69,9 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
 
 
+'''
 @torch.no_grad()
-def evaluate(model, criterion, postprocessors, data_loader, device, output_dir):
+def my_evaluate(model, criterion, postprocessors, evaluator, data_loader, device, output_dir):
     model.eval()
     criterion.eval()
 
@@ -78,7 +79,10 @@ def evaluate(model, criterion, postprocessors, data_loader, device, output_dir):
     metric_logger.add_meter('class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
     header = 'Test:'
 
-    iou_types = tuple(k for k in ('segm', 'bbox') if k in postprocessors.keys())
+    #iou_types = tuple(k for k in ('segm', 'bbox') if k in postprocessors.keys())
+    #coco_evaluator = CocoEvaluator(base_ds, iou_types)
+    # coco_evaluator.coco_eval[iou_types[0]].params.iouThrs = [0, 0.1, 0.5, 0.75]
+
 
     for samples, targets in metric_logger.log_every(data_loader, 10, header):
         samples = samples.to(device)
@@ -101,21 +105,36 @@ def evaluate(model, criterion, postprocessors, data_loader, device, output_dir):
 
         orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
         results = postprocessors['bbox'](outputs, orig_target_sizes)
-        
-        res = {}
-        for target, output in zip(targets, results):
-            keep = output["labels"] !=  criterion.num_classes
-            res[target['image_id'].item()] = {k: v[keep] for k, v in output.items()}
+        if 'segm' in postprocessors.keys():
+            target_sizes = torch.stack([t["size"] for t in targets], dim=0)
+            results = postprocessors['segm'](results, outputs, orig_target_sizes, target_sizes)
+        res = {target['image_id'].item(): output for target, output in zip(targets, results)}
+        if evaluator is not None:
+            evaluator.update(res)
 
-        #res = {target['image_id'].item(): output for target, output in zip(targets, results)}
-        ipdb.set_trace()
-        pass
-        
 
-    
+    # gather the stats from all processes
+    metric_logger.synchronize_between_processes()
+    print("Averaged stats:", metric_logger)
+    if evaluator is not None:
+        evaluator.synchronize_between_processes()
+        
+    # accumulate predictions from all images
+    if evaluator is not None:
+        evaluator.accumulate()
+        evaluator.summarize()
+        
+    stats = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+    if evaluator is not None:
+        if 'bbox' in postprocessors.keys():
+            stats['coco_eval_bbox'] = evaluator.coco_eval['bbox'].stats.tolist()
+            
+    return stats
+'''
+
 
 @torch.no_grad()
-def evaluate_coco(model, criterion, postprocessors, data_loader, base_ds, device, output_dir):
+def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, output_dir):
     model.eval()
     criterion.eval()
 
@@ -163,6 +182,7 @@ def evaluate_coco(model, criterion, postprocessors, data_loader, base_ds, device
         if coco_evaluator is not None:
             coco_evaluator.update(res)
 
+        break
         if panoptic_evaluator is not None:
             res_pano = postprocessors["panoptic"](outputs, target_sizes, orig_target_sizes)
             for i, target in enumerate(targets):
@@ -172,6 +192,7 @@ def evaluate_coco(model, criterion, postprocessors, data_loader, base_ds, device
                 res_pano[i]["file_name"] = file_name
 
             panoptic_evaluator.update(res_pano)
+            
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
