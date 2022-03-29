@@ -88,7 +88,7 @@ class KittiDetection(torchvision.datasets.Kitti):
         img_id = self.filename_to_id[filename]
         
         img, target = self.prepare(img, {"image_id": img_id, "annotations": target})
-
+        
         if self._transforms is not None:
             img, target = self._transforms(img, target)
             

@@ -311,11 +311,19 @@ def build(args):
     # For more details on this, check the following discussion
     # https://github.com/facebookresearch/detr/issues/108#issuecomment-650269223
     
-    num_classes = 20 if args.dataset_file != 'coco' else 91
+    if args.dataset_file == 'coco':
+        num_classes = 91
     
-    if args.dataset_file == "kitti":
-        max_obj_id = 8
+    elif args.dataset_file == "kitti":
+        max_obj_id = 8                  # 0 ~ 8
         num_classes = max_obj_id + 1
+
+    elif args.dataset_file == "viper":
+        max_obj_id = 31
+        num_classes = max_obj_id + 1
+
+    else:
+        num_classes = 20 
 
 
     if args.dataset_file == "coco_panoptic":
