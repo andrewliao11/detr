@@ -195,7 +195,6 @@ def main(args):
 
 
 
-
     output_dir = Path(args.output_dir)
     if args.resume:
         if args.resume.startswith('https'):

@@ -319,7 +319,8 @@ def build(args):
         num_classes = max_obj_id + 1
 
     elif args.dataset_file == "viper":
-        max_obj_id = 31
+        # viper_to_kitti
+        max_obj_id = 8
         num_classes = max_obj_id + 1
 
     else:

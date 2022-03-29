@@ -17,6 +17,7 @@ from pycocotools.coco import COCO
 import pycocotools.mask as mask_util
 
 from util.misc import all_gather
+import ipdb
 
 
 class CocoEvaluator(object):
@@ -32,7 +33,24 @@ class CocoEvaluator(object):
 
         self.img_ids = []
         self.eval_imgs = {k: [] for k in iou_types}
-
+        
+        self.summary_keys = {
+            "bbox": [
+                "AP-0.5:0.95-all-100", 
+                "AP-0.5-all-100", 
+                "AP-0.75-all-100", 
+                "AP-0.5:0.95-small-100", 
+                "AP-0.5:0.95-medium-100", 
+                "AP-0.5:0.95-large-100",
+                "AR-0.5:0.95-all-1", 
+                "AR-0.5:0.95-all-10", 
+                "AR-0.5:0.95-all-100", 
+                "AR-0.5:0.95-small-100", 
+                "AR-0.5:0.95-medium-100", 
+                "AR-0.5:0.95-large-100", 
+            ]
+        }
+        
     def update(self, predictions):
         img_ids = list(np.unique(list(predictions.keys())))
         self.img_ids.extend(img_ids)
@@ -237,14 +255,18 @@ def evaluate(self):
         for imgId in p.imgIds
         for catId in catIds}
 
+    
     evaluateImg = self.evaluateImg
     maxDet = p.maxDets[-1]
+    
     evalImgs = [
         evaluateImg(imgId, catId, areaRng, maxDet)
         for catId in catIds
         for areaRng in p.areaRng
         for imgId in p.imgIds
     ]
+
+    
     # this is NOT in the pycocotools code, but could be done outside
     evalImgs = np.asarray(evalImgs).reshape(len(catIds), len(p.areaRng), len(p.imgIds))
     self._paramsEval = copy.deepcopy(self.params)
