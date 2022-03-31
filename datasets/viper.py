@@ -2,24 +2,25 @@
 Refer here kitti labels: https://github.com/bostondiditeam/kitti/blob/master/resources/devkit_object/readme.txt
 """
 import os
-import os.path as osp
 import json
+import random
+
+import os.path as osp
 import numpy as np
 import pandas as pd
+
 from pathlib import Path
 from PIL import Image
-#from tqdm.contrib.logging import logging_redirect_tqdm
-from tqdm import tqdm
+from pycocotools.coco import COCO
 
 import torch
 from torch.utils.data import random_split
 import torchvision
 
-from .kitti import KITTI_CLASSES
-from pycocotools.coco import COCO
 import datasets.transforms as T
-import ipdb
+from .kitti import KITTI_CLASSES
 
+import ipdb
 
 
 VIPER_TO_KITTI = {
@@ -136,7 +137,6 @@ class VIPERDetection(torchvision.datasets.VisionDataset):
         
         super(VIPERDetection, self).__init__(root, **kwargs)
 
-
         self.coco_labels = COCO(osp.join(root, "bb/labels_iscrowd.json"))
         
         labels = json.load(open(osp.join(root, "bb/labels_iscrowd.json")))
@@ -152,17 +152,25 @@ class VIPERDetection(torchvision.datasets.VisionDataset):
     def load_img_paths(self):
                  
         img_paths = []
-        for img_path in tqdm(self.root.glob("img/*/*.png"), desc=f"Checking for valid data"):
+        for img_path in self.root.glob("img/*/*.png"):
             bbox_path = img_path.parent.parent.parent / "bb" / img_path.parent.name / img_path.name.replace("png", "csv")
             if bbox_path.exists():
                 img_paths.append(img_path)
 
         return img_paths
     
-    def __getitem__(self, index):
+    def __getitem__(self, idx):
         
-        img_path = self.img_paths[index]
-        img = Image.open(img_path)
+        while True:
+            try:
+                img_path = self.img_paths[idx]
+                img = Image.open(img_path)
+                break
+            except OSError:
+                idx(f"Cannot load {self.img_paths[idx]}")
+                index = random.choices(range(len(self)))[0]
+
+
         bbox_path = img_path.parent.parent.parent / "bb" / img_path.parent.name / img_path.name.replace("png", "csv")
         bboxes = np.array(pd.read_csv(bbox_path, header=None))
         

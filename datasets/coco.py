@@ -3,7 +3,9 @@
 COCO dataset which returns image_id for evaluation.
 
 Mostly copy-paste from https://github.com/pytorch/vision/blob/13b35ff/references/detection/coco_utils.py
+
 """
+import random
 from pathlib import Path
 
 import torch
@@ -12,6 +14,7 @@ import torchvision
 from pycocotools import mask as coco_mask
 
 import datasets.transforms as T
+import ipdb
 
 
 class CocoDetection(torchvision.datasets.CocoDetection):
@@ -21,7 +24,14 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         self.prepare = ConvertCocoPolysToMask(return_masks)
 
     def __getitem__(self, idx):
-        img, target = super(CocoDetection, self).__getitem__(idx)
+        while True:
+            try:
+                img, target = super(CocoDetection, self).__getitem__(idx)
+                break
+            except OSError:
+                print(f"Cannot load {self.ids[idx]}")
+                idx = random.choices(range(len(self)))[0]
+                
         image_id = self.ids[idx]
         target = {'image_id': image_id, 'annotations': target}
         img, target = self.prepare(img, target)
@@ -47,6 +57,7 @@ def convert_coco_poly_to_mask(segmentations, height, width):
     return masks
 
 
+# Coco bounding box: [top left x position, top left y position, width, height]
 class ConvertCocoPolysToMask(object):
     def __init__(self, return_masks=False):
         self.return_masks = return_masks
