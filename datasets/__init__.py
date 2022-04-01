@@ -14,12 +14,6 @@ def get_coco_api_from_dataset(dataset_val):
         
     if isinstance(dataset_val, torchvision.datasets.CocoDetection):
         return dataset_val.coco
-    #elif isinstance(dataset_val, torchvision.datasets.Kitti):
-    #    return dataset_val.coco_labels
-    
-    #elif isinstance(dataset_val, VIPERDetection):
-    #    return dataset_val.coco_labels
-
 
 def build_dataset(image_set, args):
     if args.dataset_file == 'coco':
