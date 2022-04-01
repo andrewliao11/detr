@@ -14,7 +14,8 @@ from datasets.coco_eval import CocoEvaluator
 
 import ipdb
 
-EARLY_BREAK = True
+EARLY_BREAK = False
+
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,

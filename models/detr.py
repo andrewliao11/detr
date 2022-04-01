@@ -224,6 +224,7 @@ class SetCriterion(nn.Module):
         # Retrieve the matching between the outputs of the last layer and the targets
         indices = self.matcher(outputs_without_aux, targets)
 
+
         # Compute the average number of target boxes accross all nodes, for normalization purposes
         num_boxes = sum(len(t["labels"]) for t in targets)
         num_boxes = torch.as_tensor([num_boxes], dtype=torch.float, device=next(iter(outputs.values())).device)
@@ -311,16 +312,19 @@ def build(args):
     # For more details on this, check the following discussion
     # https://github.com/facebookresearch/detr/issues/108#issuecomment-650269223
     
-    if args.dataset_file == 'coco':
+    if args.dataset_file in ['coco14', 'coco17']:
         num_classes = 91
     
     elif args.dataset_file == "kitti":
-        max_obj_id = 8                  # 0 ~ 8
+        max_obj_id = 8
+        num_classes = max_obj_id + 1
+
+    elif args.dataset_file == "virtual_kitti":
+        max_obj_id = 8
         num_classes = max_obj_id + 1
 
     elif args.dataset_file == "viper":
-        # viper_to_kitti
-        max_obj_id = 8
+        max_obj_id = 31
         num_classes = max_obj_id + 1
 
     else:

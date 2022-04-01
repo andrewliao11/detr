@@ -47,14 +47,9 @@ def build(image_set, args):
     assert root.exists(), f'provided VIPER path {root} does not exist'
 
     PATH = {
-        "train": (), 
-        "val": ()
+        "train": (root / "train" / "data", root / "train" / "labels.json"), 
+        "val": (root / "val" / "data", root / "val" / "labels.json"), 
     }
-    dataset = CocoDetection(root / "data", root / "labels.json", transforms=make_vkitti_transforms(image_set), return_masks=False)
+    dataset = CocoDetection(PATH[image_set][0], PATH[image_set][1], transforms=make_viper_transforms(image_set), return_masks=False)
     
-    #train_ratio = 0.7
-
-    #n_train = int(len(dataset)*train_ratio)
-    #lengths = [n_train, len(dataset) - n_train]
-    #train_dataset, val_dataset = random_split(dataset, lengths, generator=torch.Generator().manual_seed(42))
     return dataset

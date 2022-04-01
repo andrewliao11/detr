@@ -1,6 +1,10 @@
 ```python
-python main.py --dataset_file kitti --root_path ~/temp/ --device cpu --num_workers 0 --batch_size 4 # 12900 MB
-python main.py --dataset_file viper --root_path ~/temp/viper --device cpu --num_workers 0
+python main.py --dataset_file viper --coco_path ~/datasets/viper/coco_format --batch_size 4
+python main.py --dataset_file kitti --coco_path ~/datasets/kitti/coco_format --batch_size 4
+python main.py --dataset_file virtual_kitti --coco_path ~/datasets/virtual_kitti/coco_format --batch_size 4
+
+python main.py --dataset_file coco14 --coco_path ~/datasets/mscoco14/coco_format --batch_size 4
+python main.py --dataset_file coco17 --coco_path ~/datasets/mscoco17/coco_format --batch_size 4
 ```
 
 
