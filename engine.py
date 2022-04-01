@@ -14,6 +14,7 @@ from datasets.coco_eval import CocoEvaluator
 
 import ipdb
 
+EARLY_BREAK = True
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
@@ -60,6 +61,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         metric_logger.update(class_error=loss_dict_reduced['class_error'])
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
 
+        if EARLY_BREAK:
+            break
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
@@ -80,8 +83,6 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
     coco_evaluator = CocoEvaluator(base_ds, iou_types)
     # coco_evaluator.coco_eval[iou_types[0]].params.iouThrs = [0, 0.1, 0.5, 0.75]
 
-
-    #_i = 0
     for samples, targets in metric_logger.log_every(data_loader, 10, header):
         samples = samples.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
@@ -109,11 +110,10 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
         res = {target['image_id'].item(): output for target, output in zip(targets, results)}
         if coco_evaluator is not None:
             coco_evaluator.update(res)
+
+        if EARLY_BREAK:
+            break
         
-        #_i += 1
-        #if _i > 5:
-        #    break
-            
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()

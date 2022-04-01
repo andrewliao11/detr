@@ -2,7 +2,7 @@
 import torch.utils.data
 import torchvision
 
-from .viper import VIPERDetection
+#from .viper import VIPERDetection
 
 
 def get_coco_api_from_dataset(dataset_val):
@@ -14,17 +14,20 @@ def get_coco_api_from_dataset(dataset_val):
         
     if isinstance(dataset_val, torchvision.datasets.CocoDetection):
         return dataset_val.coco
-    elif isinstance(dataset_val, torchvision.datasets.Kitti):
-        return dataset_val.coco_labels
+    #elif isinstance(dataset_val, torchvision.datasets.Kitti):
+    #    return dataset_val.coco_labels
     
-    elif isinstance(dataset_val, VIPERDetection):
-        return dataset_val.coco_labels
+    #elif isinstance(dataset_val, VIPERDetection):
+    #    return dataset_val.coco_labels
 
 
 def build_dataset(image_set, args):
     if args.dataset_file == 'coco':
         from .coco import build as build_coco
         return build_coco(image_set, args)
+    elif args.dataset_file == 'vkitti':
+        from .virtual_kitti import build as build_vkitti
+        return build_vkitti(image_set, args)
     elif args.dataset_file == 'viper':
         from .viper import build as build_viper
         return build_viper(image_set, args)
