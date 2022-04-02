@@ -172,6 +172,18 @@ class RandomSizeCrop(object):
         return crop(img, target, region)
 
 
+class RandomSizeCropWH(object):
+    def __init__(self, min_size, max_size):
+        self.min_size = min_size
+        self.max_size = max_size
+
+    def __call__(self, img: PIL.Image.Image, target: dict):
+        w = random.randint(self.min_size[0], min(img.width, self.max_size[0]))
+        h = random.randint(self.min_size[1], min(img.height, self.max_size[1]))
+        region = T.RandomCrop.get_params(img, [h, w])
+        return crop(img, target, region)
+
+
 class CenterCrop(object):
     def __init__(self, size):
         self.size = size
