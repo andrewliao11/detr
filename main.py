@@ -120,7 +120,7 @@ def main(args):
     print(args)
     
 
-    if args.use_wandb:
+    if args.use_wandb and utils.is_main_process():
         ct = datetime.datetime.now()
         wandb.init(
             project=f"label-translation-detr-{args.dataset_file}", 

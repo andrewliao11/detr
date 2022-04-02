@@ -5,6 +5,9 @@ python main.py --dataset_file virtual_kitti --coco_path ~/datasets/virtual_kitti
 
 python main.py --dataset_file coco14 --coco_path ~/datasets/mscoco14/coco_format --batch_size 4
 python main.py --dataset_file coco17 --coco_path ~/datasets/mscoco17/coco_format --batch_size 4
+
+python -m torch.distributed.launch --nproc_per_node=2 --use_env main.py --dataset_file coco14 --coco_path ~/datasets/mscoco14/coco_format --batch_size 4 --lr_drop 100 --epochs 150 --output_dir /results --use_wandb
+python -m torch.distributed.launch --nproc_per_node=2 --use_env main.py --dataset_file coco17 --coco_path ~/datasets/mscoco17/coco_format --batch_size 4 --lr_drop 100 --epochs 150 --output_dir /results --use_wandb
 ```
 
 
