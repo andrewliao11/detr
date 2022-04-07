@@ -1,0 +1,6 @@
+
+# dataset parameters
+name: dummy
+path: None
+panoptic_path: None
+remove_difficult: False

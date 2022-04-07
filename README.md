@@ -1,14 +1,29 @@
-```python
-python main.py --dataset_file viper --coco_path ~/datasets/viper/coco_format --batch_size 4
-python main.py --dataset_file kitti --coco_path ~/datasets/kitti/coco_format --batch_size 4
-python main.py --dataset_file virtual_kitti --coco_path ~/datasets/virtual_kitti/coco_format --batch_size 4
+# Steps to Run
 
-python main.py --dataset_file coco14 --coco_path ~/datasets/mscoco14/coco_format --batch_size 4
-python main.py --dataset_file coco17 --coco_path ~/datasets/mscoco17/coco_format --batch_size 4
 
-python -m torch.distributed.launch --nproc_per_node=2 --use_env main.py --dataset_file coco14 --coco_path ~/datasets/mscoco14/coco_format --batch_size 4 --lr_drop 100 --epochs 150 --output_dir /results --use_wandb
-python -m torch.distributed.launch --nproc_per_node=2 --use_env main.py --dataset_file coco17 --coco_path ~/datasets/mscoco17/coco_format --batch_size 4 --lr_drop 100 --epochs 150 --output_dir /results --use_wandb
+## Preparation
+This will prepare the specified dataset into desired COCO structure at `~/datasets/{$dataset_name}`
+```bash
+$ cd $detr_root/datasets_preparation
+$ python {$dataset_name}_convert_to_coco.py
 ```
 
+## Run Training 
 
-Sample results on mscoco2017 at [here](https://gist.github.com/szagoruyko/b4c3b2c3627294fc369b899987385a3f)
+```bash
+$ cd $detr_root
+$ python -m torch.distributed.launch --nproc_per_node=${n_gpus} --use_env main.py --dataset_file ${dataset_name} --coco_path ~/datasets/${dataset_name}/coco_format --batch_size 4 --lr_drop 100 --epochs 150 --output_dir /results
+```
+
+- [Suggested] You can add `--use_wandb` to log the metrics on wandb server.
+- [Reference] Sample results on mscoco2017 at [here](https://gist.github.com/szagoruyko/b4c3b2c3627294fc369b899987385a3f)
+
+
+### Max batch size for 16GB mem GPU
+```yaml
+mscoco14: 4
+mscoco17: 4
+kitti: 16
+virtual_kitti: 16
+```
+

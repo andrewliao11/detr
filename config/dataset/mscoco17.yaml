@@ -1,0 +1,6 @@
+
+# dataset parameters
+name: mscoco17
+path: ~/datasets/mscoco17
+panoptic_path: None
+remove_difficult: False

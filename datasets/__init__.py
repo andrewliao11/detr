@@ -15,17 +15,17 @@ def get_coco_api_from_dataset(dataset_val):
 
 
 def build_dataset(image_set, args):
-    if args.dataset_file in ['coco14', 'coco17']:
+    if args.dataset.name in ['mscoco14', 'mscoco17']:
         from .coco import build as build_coco
         return build_coco(image_set, args)
-    elif args.dataset_file == 'virtual_kitti':
+    elif args.dataset.name == 'virtual_kitti':
         from .virtual_kitti import build as build_vkitti
         return build_vkitti(image_set, args)
-    elif args.dataset_file == 'viper':
+    elif args.dataset.name == 'viper':
         from .viper import build as build_viper
         return build_viper(image_set, args)
-    elif args.dataset_file == 'kitti':
+    elif args.dataset.name == 'kitti':
         from .kitti import build as build_kitti
         return build_kitti(image_set, args)
     else:
-        raise ValueError(f'dataset {args.dataset_file} not supported')
+        raise ValueError(f'dataset {args.dataset.name} not supported')

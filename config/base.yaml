@@ -1,0 +1,68 @@
+defaults:
+  - dataset: mscoco14
+  - additional_eval: dummy
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+  
+hydra:
+  run:
+      dir: ./outputs/${now:%Y-%m-%d_%H-%M-%S}_dataset:${dataset.name}
+
+
+seed: 123
+device: cuda
+resume: False
+start_epoch: 0
+eval_only: False
+num_workers: 2
+
+world_size: 1
+dist_url: env://          # url used to set up distributed training
+use_wandb: False
+
+
+lr: 1e-4
+lr_backbone: 1e-5
+batch_size: 2
+weight_decay: 1e-4
+epochs: 300
+lr_drop: 200
+clip_max_norm: 0.1
+
+
+frozen_weights: False
+
+# backbone
+backbone: resnet50
+dilation: False
+position_embedding: sine  # sine, learned
+
+
+# model
+enc_layers: 6
+dec_layers: 6
+dim_feedforward: 2048
+hidden_dim: 256
+dropout: 0.1
+nheads: 8
+num_queries: 100
+pre_norm: False
+
+
+# segmentation
+masks: False
+
+# loss
+no_aux_loss: True
+
+# matcher
+set_cost_class: 1
+set_cost_bbox: 5
+set_cost_giou: 2
+
+# loss coefficients
+mask_loss_coef: 1
+dice_loss_coef: 1
+bbox_loss_coef: 5
+gious_loss_coef: 2
+eos_coef: 0.1           # Relative classification weight of the no-object class

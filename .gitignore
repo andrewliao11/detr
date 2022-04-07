@@ -1,3 +1,5 @@
+outputs/
+
 .nfs*
 *.ipynb
 *.pyc

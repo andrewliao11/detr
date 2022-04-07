@@ -312,26 +312,26 @@ def build(args):
     # For more details on this, check the following discussion
     # https://github.com/facebookresearch/detr/issues/108#issuecomment-650269223
     
-    if args.dataset_file in ['coco14', 'coco17']:
+    if args.dataset.name in ['mscoco14', 'mscoco17']:
         num_classes = 91
     
-    elif args.dataset_file == "kitti":
+    elif args.dataset.name == "kitti":
         max_obj_id = 8
         num_classes = max_obj_id + 1
 
-    elif args.dataset_file == "virtual_kitti":
+    elif args.dataset.name == "virtual_kitti":
         max_obj_id = 8
         num_classes = max_obj_id + 1
 
-    elif args.dataset_file == "viper":
-        max_obj_id = 31
-        num_classes = max_obj_id + 1
+#    elif args.dataset.name == "viper":
+#        max_obj_id = 31
+#        num_classes = max_obj_id + 1
 
     else:
         num_classes = 20 
 
 
-    if args.dataset_file == "coco_panoptic":
+    if args.dataset.name == "coco_panoptic":
         # for panoptic, we just add a num_classes that is large enough to hold
         # max_obj_id + 1, but the exact value doesn't really matter
         num_classes = 250
@@ -373,7 +373,7 @@ def build(args):
     postprocessors = {'bbox': PostProcess()}
     if args.masks:
         postprocessors['segm'] = PostProcessSegm()
-        if args.dataset_file == "coco_panoptic":
+        if args.dataset.name == "coco_panoptic":
             is_thing_map = {i: i <= 90 for i in range(201)}
             postprocessors["panoptic"] = PostProcessPanoptic(is_thing_map, threshold=0.85)
 

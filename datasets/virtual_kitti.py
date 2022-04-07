@@ -17,32 +17,15 @@ def make_vkitti_transforms(image_set):
     ])
 
 
-    #scales = [480, 512, 544, 576, 608, 640, 672, 704, 736, 768, 800]
-    scales = [(800, 250), (900, 300), (1000, 300), (1100, 350)]
-
     if image_set == 'train':
         return T.Compose([
             T.RandomHorizontalFlip(),
-            T.RandomSelect(
-                #T.RandomResize(scales, max_size=1333),
-                T.RandomSizeCropWH(min_size=scales[0], max_size=scales[-1]), 
-                T.Compose([
-                    #T.RandomResize([400, 500, 600]),
-                    T.RandomResize([(1500, 450), (1200, 400)]), 
-                    #T.RandomSizeCrop(384, 600),
-                    T.RandomSizeCropWH(min_size=(1000, 300), max_size=(1000, 300)), 
-                    #T.RandomResize(scales, max_size=1333),
-                    T.RandomResize(scales),
-                ])
-            ),
             normalize,
         ])
 
 
     if image_set == 'val':
         return T.Compose([
-            #T.RandomResize([800], max_size=1333),
-            T.RandomSizeCropWH(min_size=(1000, 300), max_size=(1000, 300)), 
             normalize,
         ])
 
@@ -50,7 +33,7 @@ def make_vkitti_transforms(image_set):
 
 
 def build(image_set, args):
-    root = Path(args.coco_path)
+    root = Path(args.dataset.path)
 
     assert root.exists(), f'provided VirtualKitti path {root} does not exist'
     dataset = CocoDetection(root / "data", root / "labels.json", transforms=make_vkitti_transforms(image_set), return_masks=False)
