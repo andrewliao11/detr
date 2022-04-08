@@ -4,13 +4,13 @@ import pandas as pd
 
 from PIL import Image
 from pathlib import Path
+
+from cityscape_labels import labels as LABELS
 import ipdb
 
 
-KITTI_CLASSES = ["Car", "Van", "Truck", "Pedestrian", "Person_sitting", "Cyclist", "Tram", "Misc", "DontCare"]
-
-dataset_root = Path("/datasets/kitti")
-target_dataset_root = os.environ['HOME'] / Path("datasets/kitti/coco_format")
+dataset_root = Path("/datasets/synscapes")
+target_dataset_root = os.environ['HOME'] / Path("datasets/synscapes/coco_format")
 
 
 os.makedirs(target_dataset_root / "data", exist_ok=True)
@@ -21,7 +21,10 @@ os.chdir(target_dataset_root / "data")
 
  
 image_paths = []
-for p in Path(dataset_root / "Kitti/raw/training/image_2").glob(f"*.png"):
+for p in Path(dataset_root / "img/rgb").glob(f"*.png"):
+
+    if p.name.startswith("."):
+        continue
 
     tgt_name = p.name
     cmd = f"ln -s {p} {tgt_name}"
@@ -33,22 +36,29 @@ for p in Path(dataset_root / "Kitti/raw/training/image_2").glob(f"*.png"):
 os.chdir(target_dataset_root)
 
 
+# https://github.com/mcordts/cityscapesScripts/blob/master/cityscapesscripts/helpers/labels.py
+
+# Use Cityscape id
 labels = {
     "info": {},
     "licenses": [],
     "categories": [{
-        "id": i,
-        "name": c,
+        "id": l.id,
+        "name": l.name,
         "supercategory": "all"
-    } for i, c in enumerate(KITTI_CLASSES)],
+    } for l in LABELS if l.id  != -1],
     "images": [],
     "annotations": []
 }
 
 image_root = Path(target_dataset_root / "data")
 image_id = 1
-file_name_to_image_id = {}
+file_name_to_image_info= {}
+
 for p in image_paths:
+
+    if p.startswith("."):
+        continue
 
     w, h = Image.open(image_root / p).size
     img_dict = {
@@ -59,35 +69,42 @@ for p in image_paths:
         "width": w,
     }
     labels["images"].append(img_dict)
-    file_name_to_image_id[p] = image_id
+    file_name_to_image_info[p] = (image_id, h, w)
     image_id += 1
 
 
+
 anno_id = 1
-for anno_p in Path(dataset_root / "Kitti/raw/training/label_2").glob("*.txt"):
+for anno_p in Path(dataset_root / "meta").glob("*.json"):
     
-    
-    df = pd.read_csv(anno_p, sep=" ", index_col=False, header=None)
-    file_name = anno_p.with_suffix(".png").name
-    image_id = file_name_to_image_id[file_name]
+    metadata = json.load(open(anno_p))
+    bbox2d_dict = metadata["instance"]["bbox2d"]
+    class_dict = metadata["instance"]["class"]
+    occluded_dict = metadata["instance"]["occluded"]
+    truncated_dict = metadata["instance"]["truncated"]
 
+    file_name = anno_p.with_suffix(".png").name 
+    image_id, image_height, image_width = file_name_to_image_info[file_name]
+    for instance_id in bbox2d_dict.keys():
 
-    for i, row in df.iterrows():
-        
-        left, top, right, bottom = row[4:8]
-        x_top_left, y_top_left, width, height = left, top, right-left, bottom-top
-        category_id = KITTI_CLASSES.index(row[0])
+        if class_dict[instance_id] != -1:
+            x_top_left = bbox2d_dict[instance_id]["xmin"] * image_width
+            y_top_left = bbox2d_dict[instance_id]["ymin"] * image_height
+            width = (bbox2d_dict[instance_id]["xmax"] - bbox2d_dict[instance_id]["xmin"]) * image_width
+            height = (bbox2d_dict[instance_id]["ymax"] - bbox2d_dict[instance_id]["ymin"]) * image_height
+            new_anno_dict = {
+                "id": anno_id, 
+                "image_id": image_id, 
+                "bbox": [x_top_left, y_top_left, width, height], 
+                "category_id": class_dict[instance_id], 
+                "occluded": occluded_dict[instance_id], 
+                "truncated": truncated_dict[instance_id], 
+                "iscrowd": 0, 
+                "area": width*height
+            }
 
-        new_anno_dict = {
-            "id": anno_id,
-            "image_id": image_id,
-            "bbox": [x_top_left, y_top_left, width, height],
-            "category_id": category_id,
-            "iscrowd": 0,
-            "area": width*height
-        }
-        labels["annotations"].append(new_anno_dict)
-        anno_id += 1
+            labels["annotations"].append(new_anno_dict)
+            anno_id += 1
 
 
 json.dump(labels, open("labels.json", "w"))

@@ -1,6 +1,7 @@
 
 # dataset parameters
 name: mscoco14
-path: ~/datasets/mscoco14
+path: datasets/mscoco14
 panoptic_path: None
 remove_difficult: False
+masks: False

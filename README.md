@@ -27,3 +27,15 @@ kitti: 16
 virtual_kitti: 16
 ```
 
+## Conda env
+```bash
+$ conda create -n label-translation python=3.7.11
+$ conda activate label-translation
+$ pip install hydra-core hydra_colorlog --upgrade
+$ pip install wandb
+$ conda install pandas
+$ conda install -c anaconda pillow 
+$ pip install ipdb
+$ conda install -c conda-forge pycocotools 
+$ conda install -c anaconda scipy 
+```

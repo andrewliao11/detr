@@ -14,18 +14,32 @@ def get_coco_api_from_dataset(dataset_val):
         return dataset_val.coco
 
 
-def build_dataset(image_set, args):
-    if args.dataset.name in ['mscoco14', 'mscoco17']:
+def get_class_mapping(dataset):
+    for _ in range(10):
+        # if isinstance(dataset, torchvision.datasets.CocoDetection):
+        #     break
+        if isinstance(dataset, torch.utils.data.Subset):
+            dataset = dataset.dataset
+        
+    if isinstance(dataset, torchvision.datasets.CocoDetection):
+        return {d["id"]: d["name"].lower() for d in dataset.coco.dataset["categories"]}
+
+
+def build_dataset(image_set, dataset_args, given_class_mapping=None):
+    if dataset_args.name in ['mscoco14', 'mscoco17']:
         from .coco import build as build_coco
-        return build_coco(image_set, args)
-    elif args.dataset.name == 'virtual_kitti':
+        return build_coco(image_set, dataset_args, given_class_mapping=given_class_mapping)
+    elif dataset_args.name == 'virtual_kitti':
         from .virtual_kitti import build as build_vkitti
-        return build_vkitti(image_set, args)
-    elif args.dataset.name == 'viper':
+        return build_vkitti(image_set, dataset_args, given_class_mapping=given_class_mapping)
+    elif dataset_args.name == 'viper':
         from .viper import build as build_viper
-        return build_viper(image_set, args)
-    elif args.dataset.name == 'kitti':
+        return build_viper(image_set, dataset_args, given_class_mapping=given_class_mapping)
+    elif dataset_args.name == 'kitti':
         from .kitti import build as build_kitti
-        return build_kitti(image_set, args)
+        return build_kitti(image_set, dataset_args, given_class_mapping=given_class_mapping)
+    elif dataset_args.name == 'synscapes':
+        from .synscapes import build as build_synscapes
+        return build_synscapes(image_set, dataset_args, given_class_mapping=given_class_mapping)
     else:
-        raise ValueError(f'dataset {args.dataset.name} not supported')
+        raise ValueError(f'dataset {dataset_args.name} not supported')

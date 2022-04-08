@@ -1,6 +1,7 @@
 """
 potential reference for augmentation: https://github.com/QiuJueqin/SqueezeDet-PyTorch/blob/master/src/datasets/base.py
 """
+import os
 from pathlib import Path
 
 import torch
@@ -34,11 +35,11 @@ def make_kitti_transforms(image_set):
     raise ValueError(f'unknown {image_set}')
 
 
-def build(image_set, args):
-    root = Path(args.dataset.path)
+def build(image_set, dataset_args, given_class_mapping=None):
+    root = os.environ['HOME'] / Path(dataset_args.path)
 
     assert root.exists(), f'provided Kitti path {root} does not exist'
-    dataset = CocoDetection(root / "data", root / "labels.json", transforms=make_kitti_transforms(image_set), return_masks=False)
+    dataset = CocoDetection(root / "data", root / "labels.json", transforms=make_kitti_transforms(image_set), return_masks=False, given_class_mapping=given_class_mapping)
     train_ratio = 0.7
 
     n_train = int(len(dataset)*train_ratio)

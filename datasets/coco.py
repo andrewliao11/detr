@@ -5,6 +5,7 @@ COCO dataset which returns image_id for evaluation.
 Mostly copy-paste from https://github.com/pytorch/vision/blob/13b35ff/references/detection/coco_utils.py
 
 """
+import os
 import random
 from pathlib import Path
 
@@ -18,7 +19,10 @@ import ipdb
 
 
 class CocoDetection(torchvision.datasets.CocoDetection):
-    def __init__(self, img_folder, ann_file, transforms, return_masks):
+    def __init__(self, img_folder, ann_file, transforms, return_masks, given_class_mapping=None):
+        if given_class_mapping is not None:
+            ipdb.set_trace()
+
         super(CocoDetection, self).__init__(img_folder, ann_file)
         self._transforms = transforms
         self.prepare = ConvertCocoPolysToMask(return_masks)
@@ -155,13 +159,13 @@ def make_coco_transforms(image_set):
     raise ValueError(f'unknown {image_set}')
 
 
-def build(image_set, args):
-    root = Path(args.dataset.path)
+def build(image_set, dataset_args, given_class_mapping=None):
+    root = os.environ['HOME'] / Path(dataset_args.path)
     assert root.exists(), f'provided COCO path {root} does not exist'
 
     PATH = {
         "train": (root / "train" / "data", root / "train" / "labels.json"), 
         "val": (root / "val" / "data", root / "val" / "labels.json"), 
     }
-    dataset = CocoDetection(PATH[image_set][0], PATH[image_set][1], transforms=make_coco_transforms(image_set), return_masks=args.masks)
+    dataset = CocoDetection(PATH[image_set][0], PATH[image_set][1], transforms=make_coco_transforms(image_set), return_masks=dataset_args.masks, given_class_mapping=given_class_mapping)
     return dataset

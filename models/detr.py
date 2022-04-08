@@ -323,10 +323,9 @@ def build(args):
         max_obj_id = 8
         num_classes = max_obj_id + 1
 
-#    elif args.dataset.name == "viper":
-#        max_obj_id = 31
-#        num_classes = max_obj_id + 1
-
+    elif args.dataset.name == "synscapes":
+        max_obj_id = 33
+        num_classes = max_obj_id + 1
     else:
         num_classes = 20 
 
@@ -349,14 +348,15 @@ def build(args):
         num_queries=args.num_queries,
         aux_loss=args.aux_loss,
     )
-    if args.masks:
+    if args.dataset.masks:
         model = DETRsegm(model, freeze_detr=(args.frozen_weights is not None))
     matcher = build_matcher(args)
     weight_dict = {'loss_ce': 1, 'loss_bbox': args.bbox_loss_coef}
     weight_dict['loss_giou'] = args.giou_loss_coef
-    if args.masks:
+    if args.dataset.masks:
         weight_dict["loss_mask"] = args.mask_loss_coef
         weight_dict["loss_dice"] = args.dice_loss_coef
+        
     # TODO this is a hack
     if args.aux_loss:
         aux_weight_dict = {}
@@ -365,13 +365,13 @@ def build(args):
         weight_dict.update(aux_weight_dict)
 
     losses = ['labels', 'boxes', 'cardinality']
-    if args.masks:
+    if args.dataset.masks:
         losses += ["masks"]
     criterion = SetCriterion(num_classes, matcher=matcher, weight_dict=weight_dict,
                              eos_coef=args.eos_coef, losses=losses)
     criterion.to(device)
     postprocessors = {'bbox': PostProcess()}
-    if args.masks:
+    if args.dataset.masks:
         postprocessors['segm'] = PostProcessSegm()
         if args.dataset.name == "coco_panoptic":
             is_thing_map = {i: i <= 90 for i in range(201)}

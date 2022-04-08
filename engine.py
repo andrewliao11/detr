@@ -13,6 +13,8 @@ import util.misc as utils
 from datasets.coco_eval import CocoEvaluator
 
 import ipdb
+import logging
+logger = logging.getLogger(__name__)
 
 EARLY_BREAK = False
 
@@ -48,8 +50,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         loss_value = losses_reduced_scaled.item()
 
         if not math.isfinite(loss_value):
-            print("Loss is {}, stopping training".format(loss_value))
-            print(loss_dict_reduced)
+            logger.info("Loss is {}, stopping training".format(loss_value))
+            logger.info(loss_dict_reduced)
             sys.exit(1)
 
         optimizer.zero_grad()
@@ -67,7 +69,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
-    print("Averaged stats:", metric_logger)
+    logger.info("Averaged stats:", metric_logger)
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
 
 
@@ -118,7 +120,7 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device):
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
-    print("Averaged stats:", metric_logger)
+    logger.info("Averaged stats:", metric_logger)
     if coco_evaluator is not None:
         coco_evaluator.synchronize_between_processes()
 
