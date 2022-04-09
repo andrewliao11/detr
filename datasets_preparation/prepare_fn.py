@@ -21,7 +21,7 @@ class BaseCOCOPrepare():
 
 class Mscoco14Prepare(BaseCOCOPrepare):
     def __init__(self):
-        super(Mscoco14Prepare).__init__(self, "mscoco14", "/datasets/mscoco14")
+        super(Mscoco14Prepare, self).__init__("mscoco14", "/datasets/mscoco14")
 
     def prepare_images(self):
 
@@ -47,7 +47,7 @@ class Mscoco14Prepare(BaseCOCOPrepare):
 
 class Mscoco17Prepare(BaseCOCOPrepare):
     def __init__(self):
-        super(Mscoco17Prepare).__init__(self, "mscoco17", "/datasets/mscoco17")
+        super(Mscoco17Prepare, self).__init__("mscoco17", "/datasets/mscoco17")
 
     def prepare_images(self):
 
@@ -77,7 +77,7 @@ class KittiPrepare(BaseCOCOPrepare):
     KITTI_CLASSES = ["Car", "Van", "Truck", "Pedestrian", "Person_sitting", "Cyclist", "Tram", "Misc", "DontCare"]
 
     def __init__(self):
-        super(KittiPrepare).__init__(self, "kitti", "/datasets/kitti")
+        super(KittiPrepare, self).__init__("kitti", "/datasets/kitti")
 
     def prepare_images(self):
 
@@ -169,7 +169,7 @@ class VirtualKittiPrepare(BaseCOCOPrepare):
     VARIANTS = ["clone", "morning", "sunset", "overcast", "fog", "rain"]
 
     def __init__(self):
-        super(VirtualKittiPrepare).__init__(self, "virtual_kitti", "/datasets/virtual_kitti")
+        super(VirtualKittiPrepare, self).__init__("virtual_kitti", "/datasets/virtual_kitti")
 
     def prepare_images(self):
 
@@ -265,7 +265,7 @@ class VirtualKittiPrepare(BaseCOCOPrepare):
 class SynscapesPrepare(BaseCOCOPrepare):
 
     def __init__(self):
-        super(SynscapesPrepare).__init__(self, "synscapes", "/datasets/synscapes")
+        super(SynscapesPrepare, self).__init__("synscapes", "/datasets/synscapes")
 
     def prepare_images(self):
 
