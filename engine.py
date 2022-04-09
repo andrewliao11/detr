@@ -120,7 +120,7 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device):
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
-    logger.info("Averaged stats:", metric_logger)
+    logger.info(f"Averaged stats: {metric_logger}")
     if coco_evaluator is not None:
         coco_evaluator.synchronize_between_processes()
 
@@ -130,6 +130,8 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device):
         coco_evaluator.summarize()
 
     stats = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+    
+    
     if coco_evaluator is not None:
         if 'bbox' in postprocessors.keys():
             for k, v in zip(coco_evaluator.summary_keys["bbox"], coco_evaluator.coco_eval['bbox'].stats.tolist()):

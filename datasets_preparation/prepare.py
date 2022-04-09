@@ -1,7 +1,7 @@
 import os
 import argparse
 from pathlib import Path
-from prepare_fn import Mscoco14Prepare, Mscoco17Prepare, KittiPrepare, VirtualKittiPrepare, SynscapesPrepare
+from prepare_fn import Mscoco14Prepare, Mscoco17Prepare, KittiPrepare, VirtualKittiPrepare, SynscapesPrepare, CityscapesPrepare
 
 def main():
 
@@ -11,6 +11,7 @@ def main():
 
     print(args.datasets)
     for name in args.datasets:
+        print(f"Process {name}")
         if name == "mscoco14":
             Mscoco14Prepare().prepare()
         elif name == "mscoco17":
@@ -21,6 +22,8 @@ def main():
             VirtualKittiPrepare().prepare()
         elif name == "synscapes":
             SynscapesPrepare().prepare()
+        elif name == "cityscapes":
+            CityscapesPrepare().prepare()
         else:
             raise ValueError
             

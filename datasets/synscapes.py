@@ -45,4 +45,7 @@ def build(image_set, dataset_args, given_class_mapping=None):
     n_train = int(len(dataset)*train_ratio)
     lengths = [n_train, len(dataset) - n_train]
     train_dataset, val_dataset = random_split(dataset, lengths, generator=torch.Generator().manual_seed(42))
-    return dataset
+    if image_set == "train":
+        return train_dataset
+    elif image_set == "val":
+        return val_dataset

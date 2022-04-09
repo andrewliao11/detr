@@ -41,5 +41,8 @@ def build_dataset(image_set, dataset_args, given_class_mapping=None):
     elif dataset_args.name == 'synscapes':
         from .synscapes import build as build_synscapes
         return build_synscapes(image_set, dataset_args, given_class_mapping=given_class_mapping)
+    elif dataset_args.name == 'cityscapes':
+        from .cityscapes import build as build_cityscapes
+        return build_cityscapes(image_set, dataset_args, given_class_mapping=given_class_mapping)
     else:
         raise ValueError(f'dataset {dataset_args.name} not supported')

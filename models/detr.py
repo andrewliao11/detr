@@ -326,6 +326,10 @@ def build(args):
     elif args.dataset.name == "synscapes":
         max_obj_id = 33
         num_classes = max_obj_id + 1
+        
+    elif args.dataset.name == "cityscapes":
+        max_obj_id = 33
+        num_classes = max_obj_id + 1
     else:
         num_classes = 20 
 

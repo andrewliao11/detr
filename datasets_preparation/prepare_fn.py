@@ -1,13 +1,21 @@
 import os
+import json
+import pandas as pd
 
+from tqdm import tqdm
+from PIL import Image
 from pathlib import Path
+
+# https://github.com/mcordts/cityscapesScripts/blob/master/cityscapesscripts/helpers/labels.py
+from cityscape_labels import labels as CITYSCAPES_LABELS
+        
 import ipdb
 
 class BaseCOCOPrepare():
     def __init__(self, dataset_name, dataset_root):
         self.dataset_name = dataset_name
-        self.dataset_root = dataset_root
-        self.target_dataset_root = os.environ["HOME"] / f"datasets/{self.dataset_name}/coco_format"
+        self.dataset_root = Path(dataset_root)
+        self.target_dataset_root = os.environ["HOME"] / Path(f"datasets/{self.dataset_name}/coco_format")
 
         
     def prepare_images(self):
@@ -25,24 +33,34 @@ class Mscoco14Prepare(BaseCOCOPrepare):
 
     def prepare_images(self):
 
+        
         os.makedirs(self.target_dataset_root / "train", exist_ok=True)
+        
         os.chdir(self.target_dataset_root / "train")
         cmd = f"ln -s {self.dataset_root / 'train2014/train2014'} data"
-        os.system(cmd)
+        
+        if not Path("data").exists():
+            os.system(cmd)
 
-        os.makedirs(target_dataset_root / "val", exist_ok=True)
-        os.chdir(target_dataset_root / "val")
-        cmd = f"ln -s {dataset_root / 'val2014/val2014'} data"
-        os.system(cmd)
+        os.makedirs(self.target_dataset_root / "val", exist_ok=True)
+        os.chdir(self.target_dataset_root / "val")
+        cmd = f"ln -s {self.dataset_root / 'val2014/val2014'} data"
+        
+        if not Path("data").exists():
+            os.system(cmd)
 
     def prepare_labels(self):
         os.chdir(self.target_dataset_root / "train")
-        cmd = f"ln -s {dataset_root / 'instances_train-val2014/annotations/instances_train2014.json'} labels.json"
-        os.system(cmd)
+        cmd = f"ln -s {self.dataset_root / 'instances_train-val2014/annotations/instances_train2014.json'} labels.json"
+        
+        if not Path("labels.json").exists():
+            os.system(cmd)
 
-        os.chdir(target_dataset_root / "val")
-        cmd = f"ln -s {dataset_root / 'instances_train-val2014/annotations/instances_val2014.json'} labels.json"
-        os.system(cmd)
+        os.chdir(self.target_dataset_root / "val")
+        cmd = f"ln -s {self.dataset_root / 'instances_train-val2014/annotations/instances_val2014.json'} labels.json"
+        if not Path("labels.json").exists():
+            os.system(cmd)
+
 
 
 class Mscoco17Prepare(BaseCOCOPrepare):
@@ -51,26 +69,34 @@ class Mscoco17Prepare(BaseCOCOPrepare):
 
     def prepare_images(self):
 
-        os.makedirs(target_dataset_root / "train", exist_ok=True)
-        os.chdir(target_dataset_root / "train")
-        cmd = f"ln -s {dataset_root / 'train2017'} data"
-        os.system(cmd)
+        os.makedirs(self.target_dataset_root / "train", exist_ok=True)
+        os.chdir(self.target_dataset_root / "train")
+        cmd = f"ln -s {self.dataset_root / 'train2017'} data"
+        
+        if not Path("data").exists():
+            os.system(cmd)
+            
 
-        os.makedirs(target_dataset_root / "val", exist_ok=True)
-        os.chdir(target_dataset_root / "val")
-        cmd = f"ln -s {dataset_root / 'val2017'} data"
-        os.system(cmd)
+        os.makedirs(self.target_dataset_root / "val", exist_ok=True)
+        os.chdir(self.target_dataset_root / "val")
+        cmd = f"ln -s {self.dataset_root / 'val2017'} data"
+        if not Path("data").exists():
+            os.system(cmd)
+            
 
     def prepare_labels(self):
 
-        os.chdir(target_dataset_root / "train")
-        cmd = f"ln -s {dataset_root / 'annotations/instances_train2017.json'} labels.json"
-        os.system(cmd)
+        os.chdir(self.target_dataset_root / "train")
+        cmd = f"ln -s {self.dataset_root / 'annotations/instances_train2017.json'} labels.json"
+        if not Path("labels.json").exists():
+            os.system(cmd)
 
-        os.chdir(target_dataset_root / "val")
 
-        cmd = f"ln -s {dataset_root / 'annotations/instances_val2017.json'} labels.json"
-        os.system(cmd)
+        os.chdir(self.target_dataset_root / "val")
+
+        cmd = f"ln -s {self.dataset_root / 'annotations/instances_val2017.json'} labels.json"
+        if not Path("labels.json").exists():
+            os.system(cmd)
 
 
 class KittiPrepare(BaseCOCOPrepare):
@@ -99,7 +125,7 @@ class KittiPrepare(BaseCOCOPrepare):
                 
         assert hasattr(self, "_image_paths"), "Need to call self.prepare_images first"
 
-        os.chdir(target_dataset_root)
+        os.chdir(self.target_dataset_root)
 
         labels = {
             "info": {},
@@ -134,7 +160,7 @@ class KittiPrepare(BaseCOCOPrepare):
 
 
         anno_id = 1
-        for anno_p in Path(self.dataset_root / "Kitti/raw/training/label_2").glob("*.txt"):
+        for anno_p in tqdm(Path(self.dataset_root / "Kitti/raw/training/label_2").glob("*.txt"), desc="Process Kitti"):
             
             
             df = pd.read_csv(anno_p, sep=" ", index_col=False, header=None)
@@ -210,7 +236,7 @@ class VirtualKittiPrepare(BaseCOCOPrepare):
         image_root = Path(self.target_dataset_root / "data")
         image_id = 1
         file_name_to_image_id = {}
-        for p in image_paths:
+        for p in self._image_paths:
 
             w, h = Image.open(image_root / p).size
             img_dict = {
@@ -227,7 +253,7 @@ class VirtualKittiPrepare(BaseCOCOPrepare):
 
 
         anno_id = 1
-        for anno_p in self.dataset_root.glob("vkitti_1.3.1_motgt/*.txt"):
+        for anno_p in tqdm(self.dataset_root.glob("vkitti_1.3.1_motgt/*.txt"), desc="Process Virtual Kitti"):
             if any([v in str(anno_p) for v in self.VARIANTS]):
 
                     world, variation = anno_p.stem.split("_")
@@ -292,8 +318,6 @@ class SynscapesPrepare(BaseCOCOPrepare):
 
         os.chdir(self.target_dataset_root)
 
-        # https://github.com/mcordts/cityscapesScripts/blob/master/cityscapesscripts/helpers/labels.py
-        from cityscape_labels import labels as LABELS
         
         # Use Cityscape id
         labels = {
@@ -303,7 +327,7 @@ class SynscapesPrepare(BaseCOCOPrepare):
                 "id": l.id,
                 "name": l.name,
                 "supercategory": "all"
-            } for l in LABELS if l.id  != -1],
+            } for l in CITYSCAPES_LABELS if l.id  != -1],
             "images": [],
             "annotations": []
         }
@@ -332,7 +356,7 @@ class SynscapesPrepare(BaseCOCOPrepare):
 
 
         anno_id = 1
-        for anno_p in Path(self.dataset_root / "meta").glob("*.json"):
+        for anno_p in tqdm(Path(self.dataset_root / "meta").glob("*.json"), desc="Process synscape"):
             
             metadata = json.load(open(anno_p))
             bbox2d_dict = metadata["instance"]["bbox2d"]
@@ -345,10 +369,12 @@ class SynscapesPrepare(BaseCOCOPrepare):
             for instance_id in bbox2d_dict.keys():
 
                 if class_dict[instance_id] != -1:
+                    
                     x_top_left = bbox2d_dict[instance_id]["xmin"] * image_width
                     y_top_left = bbox2d_dict[instance_id]["ymin"] * image_height
                     width = (bbox2d_dict[instance_id]["xmax"] - bbox2d_dict[instance_id]["xmin"]) * image_width
                     height = (bbox2d_dict[instance_id]["ymax"] - bbox2d_dict[instance_id]["ymin"]) * image_height
+                    
                     new_anno_dict = {
                         "id": anno_id, 
                         "image_id": image_id, 
@@ -365,3 +391,135 @@ class SynscapesPrepare(BaseCOCOPrepare):
 
 
         json.dump(labels, open("labels.json", "w"))
+
+        
+
+class CityscapesPrepare(BaseCOCOPrepare):
+
+    def __init__(self):
+        super(CityscapesPrepare, self).__init__("cityscapes", "/datasets/cityscapes")
+
+    def prepare_images(self):
+        
+        image_paths = {
+            "train": [], 
+            "val": []
+        }
+        for split in ["train", "val"]:
+            os.makedirs(self.target_dataset_root / f"{split}/data", exist_ok=True)
+            os.chdir(self.target_dataset_root / f"{split}/data")
+
+            for p in Path(self.dataset_root / f"leftImg8bit/{split}").glob(f"*/*.png"):
+
+                #if p.name.startswith("."):
+                #    continue
+
+                tgt_name = p.name
+                cmd = f"ln -s {p} {tgt_name}"
+                if not Path(tgt_name).exists():
+                    os.system(cmd)
+                image_paths[split].append(tgt_name)
+
+        self._image_paths = image_paths
+
+    def prepare_labels(self):
+        
+        from cityscapesscripts.helpers.annotation import CsBbox3d
+        from cityscapesscripts.helpers.box3dImageTransform import (
+            Camera, 
+            Box3dImageTransform,
+            CRS_V,
+            CRS_C,
+            CRS_S
+        )
+        
+        assert hasattr(self, "_image_paths"), "Need to call self.prepare_images first"
+        
+        
+        for split in ["train", "val"]:
+
+            os.chdir(self.target_dataset_root / split)
+            
+            labels = {
+                "info": {},
+                "licenses": [],
+                "categories": [{
+                    "id": l.id,
+                    "name": l.name,
+                    "supercategory": "all"
+                } for l in CITYSCAPES_LABELS if l.id  != -1],
+                "images": [],
+                "annotations": []
+            }
+            
+            class_name_to_id = {i["name"]: i["id"] for i in labels["categories"]}
+
+            image_root = Path(self.target_dataset_root / f"{split}/data")
+            image_id = 1
+            file_name_to_image_info= {}
+
+            for p in self._image_paths[split]:
+
+                #if p.startswith("."):
+                #    continue
+
+                w, h = Image.open(image_root / p).size
+                img_dict = {
+                    "id": image_id,
+                    "license": 1,
+                    "file_name": p,
+                    "height": h,
+                    "width": w,
+                }
+                labels["images"].append(img_dict)
+                file_name_to_image_info[p] = (image_id, h, w)
+                image_id += 1
+
+
+            anno_id = 1
+            for anno_p in tqdm(Path(self.dataset_root / f"gtBbox3d/{split}").glob("*/*.json"), desc=f"Processing cityscape {split}"):
+
+                metadata = json.load(open(anno_p))
+                
+                camera = Camera(fx=metadata["sensor"]["fx"],
+                        fy=metadata["sensor"]["fy"],
+                        u0=metadata["sensor"]["u0"],
+                        v0=metadata["sensor"]["v0"],
+                        sensor_T_ISO_8855=metadata["sensor"]["sensor_T_ISO_8855"]
+                )
+
+                box3d_annotation = Box3dImageTransform(camera=camera)
+
+                    
+                objects_dict = metadata["objects"]
+                
+                    
+                file_name = anno_p.with_suffix(".png").name.replace("gtBbox3d", "leftImg8bit")
+                image_id, image_height, image_width = file_name_to_image_info[file_name]
+                
+                
+                for obj_dict in objects_dict:
+                    obj = CsBbox3d()
+                    obj.fromJsonText(obj_dict)
+
+                    
+                    x_top_left, y_top_left, x_bottom_right, y_bottom_right = obj.bbox_2d.bbox_modal
+                    bbox_width = x_bottom_right - x_top_left
+                    bbox_height = y_bottom_right - y_top_left
+                    
+                    
+                    new_anno_dict = {
+                        "id": anno_id, 
+                        "image_id": image_id, 
+                        "bbox": [x_top_left, y_top_left, bbox_width, bbox_height], 
+                        "category_id": class_name_to_id[obj_dict["label"]], 
+                        "occluded": obj_dict["occlusion"], 
+                        "truncated": obj_dict["truncation"], 
+                        "iscrowd": 0, 
+                        "area": bbox_width*bbox_height
+                    }
+
+                    labels["annotations"].append(new_anno_dict)
+                    anno_id += 1
+                    
+            json.dump(labels, open("labels.json", "w"))

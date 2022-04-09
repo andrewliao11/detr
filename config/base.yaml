@@ -1,4 +1,5 @@
 defaults:
+  - _self_                # `defaults` override `base` params https://hydra.cc/docs/upgrades/1.0_to_1.1/default_composition_order/
   - dataset: mscoco14
   - add_dataset: dummy    # Not assume the classes in main and addtional datasets are the same
   - override hydra/job_logging: colorlog
@@ -16,11 +17,13 @@ start_epoch: 0
 eval_only: False
 num_workers: 2
 
+# distributed training
 world_size: 1
 dist_url: env://          # url used to set up distributed training
 use_wandb: False
 distributed: "???"
 
+# training hparams
 lr: 1e-4
 lr_backbone: 1e-5
 batch_size: 2
