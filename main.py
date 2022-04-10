@@ -45,7 +45,7 @@ def main(args):
         import wandb
         ct = datetime.datetime.now()
         wandb.init(
-            project=f"label-translation-detr-{args.dataset_file}", 
+            project=f"label-translation-detr-{args.dataset.name}", 
             entity="andrew-liao", 
             name=f"{ct.year}.{ct.month}.{ct.day}.{ct.hour}.{ct.minute}.{ct.second}", 
             config=args
@@ -115,7 +115,7 @@ def main(args):
     
     
     
-    if args.dataset.name != args.add_dataset.name and args.add_dataset.name != "dummy":
+    if args.add_dataset.name != "dummy":
         class_mapping = get_class_mapping(dataset_train)
         add_dataset_val = build_dataset(image_set='val', dataset_args=args.add_dataset, given_class_mapping=class_mapping)
         if args.distributed:
@@ -145,7 +145,6 @@ def main(args):
         else:
             checkpoint = torch.load(args.resume, map_location='cpu')
         model_without_ddp.load_state_dict(checkpoint['model'])
-        
         if not args.eval_only and 'optimizer' in checkpoint and 'lr_scheduler' in checkpoint and 'epoch' in checkpoint:
             optimizer.load_state_dict(checkpoint['optimizer'])
             lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
@@ -171,13 +170,12 @@ def main(args):
             args.clip_max_norm)
         lr_scheduler.step()
         
-        
-
     
         checkpoint_paths = [output_dir / 'checkpoint.pth']
         # extra checkpoint before LR drop and every 100 epochs
-        if (epoch + 1) % args.lr_drop == 0 or (epoch + 1) % 100 == 0:
+        if (epoch + 1) % args.lr_drop == 0 or (epoch + 1) % 50 == 0:
             checkpoint_paths.append(output_dir / f'checkpoint{epoch:04}.pth')
+
         for checkpoint_path in checkpoint_paths:
             utils.save_on_master({
                 'model': model_without_ddp.state_dict(),
@@ -188,6 +186,7 @@ def main(args):
             }, checkpoint_path)
         
         
+        logger.info(f"[{epoch}] Evaluate on {args.dataset.name} ({args.dataset.path})")
         test_stats, coco_evaluator = evaluate(
             model, criterion, postprocessors, data_loader_val, base_ds, device
         )
@@ -198,7 +197,8 @@ def main(args):
                      'n_parameters': n_parameters}
 
         
-        if args.dataset.name != args.add_dataset.name and args.add_dataset.name != "dummy":
+        if args.add_dataset.name != "dummy":
+            logger.info(f"[{epoch}] Evaluate on {args.add_dataset.name} ({args.add_dataset.path})")
             add_test_stats, add_coco_evaluator = evaluate(
                 model, criterion, postprocessors, add_data_loader_val, add_base_ds, device
             )
@@ -219,7 +219,7 @@ def main(args):
                 (output_dir / 'eval').mkdir(exist_ok=True)
                 if "bbox" in coco_evaluator.coco_eval:
                     filenames = ['latest.pth']
-                    if epoch % 50 == 0:
+                    if (epoch + 1) % 50 == 0:
                         filenames.append(f'{epoch:03}.pth')
                     for name in filenames:
                         torch.save(coco_evaluator.coco_eval["bbox"].eval,

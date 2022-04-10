@@ -16,24 +16,102 @@ class BaseCOCOPrepare():
         self.dataset_name = dataset_name
         self.dataset_root = Path(dataset_root)
         self.target_dataset_root = os.environ["HOME"] / Path(f"datasets/{self.dataset_name}/coco_format")
-
         
     def prepare_images(self):
         raise NotImplementedError
-
 
     def prepare(self):
         self.prepare_images()
         self.prepare_labels()
 
+    def scale_bbox(self, bbox, image_w, image_h):
+        ratio, direction = self.scale
+        assert ratio >= 0., "ratio need to be positive"
+        assert direction in ["up", "down"], "direction need to be either up or down"
+        
+        x_top_left, y_top_left, bbox_width, bbox_height = bbox
+        
+        x_bottom_right = x_top_left + bbox_width
+        y_bottom_right = y_top_left + bbox_height
+        
+        x_center = (x_top_left + x_bottom_right) / 2.
+        y_center = (y_top_left + y_bottom_right) / 2.
+        
+        if direction == "up":
+            y_top_left = y_center - bbox_height * (1+ratio) / 2.
+            y_bottom_right = y_center + bbox_height * (1+ratio) / 2.
+            
+            x_top_left = x_center - bbox_width * (1+ratio) / 2.
+            x_bottom_right = x_center + bbox_width * (1+ratio) / 2.
+            
+            y_top_left = max(0, y_top_left)
+            y_bottom_right = min(image_h, y_bottom_right)
+            
+            x_top_left = max(0, x_top_left)
+            x_bottom_right = min(image_w, x_bottom_right)
+            
+        if direction == "down":
+            y_top_left = y_center - bbox_height * (1-ratio) / 2.
+            y_bottom_right = y_center + bbox_height * (1-ratio) / 2.
+            
+            x_top_left = x_center - bbox_width * (1-ratio) / 2.
+            x_bottom_right = x_center + bbox_width * (1-ratio) / 2.
+            
+            y_top_left = max(0, y_top_left)
+            y_bottom_right = min(image_h, y_bottom_right)
+            
+            x_top_left = max(0, x_top_left)
+            x_bottom_right = min(image_w, x_bottom_right)
+            
+        new_bbox_width = x_bottom_right - x_top_left
+        new_bbox_height = y_bottom_right - y_top_left
+        return [x_top_left, y_top_left, new_bbox_width, new_bbox_height]
+
+    def shift_bbox(self, bbox, image_w, image_h):
+        ratio, direction = self.shift
+        assert ratio >= 0., "ratio need to be positive"
+        assert direction in ["left", "right", "up", "down"], "direction need to be either left, right, top, bottom"
+        x_top_left, y_top_left, bbox_width, bbox_height = bbox
+        
+        x_bottom_right = x_top_left + bbox_width
+        y_bottom_right = y_top_left + bbox_height
+        
+        if direction == "up":
+            offset = ratio * bbox_height
+            y_top_left = max(0, y_top_left - offset)
+            y_bottom_right -= offset
+            
+        if direction == "down":
+            offset = ratio * bbox_height
+            y_top_left += offset
+            y_bottom_right = min(image_h, y_bottom_right + offset)
+            
+        if direction == "left":
+            offset = ratio * bbox_width
+            
+            x_top_left = max(0, x_top_left - offset)
+            x_bottom_right -= x_bottom_right
+            
+        if direction == "right":
+            offset = ratio * bbox_width
+            x_top_left += x_top_left
+            x_bottom_right = min(image_w, x_bottom_right + offset)
+            
+            
+        new_bbox_height = y_bottom_right - y_top_left
+        new_bbox_width = x_bottom_right - x_top_left
+            
+        return [x_top_left, y_top_left, new_bbox_width, new_bbox_height]
+
 
 class Mscoco14Prepare(BaseCOCOPrepare):
     def __init__(self):
-        super(Mscoco14Prepare, self).__init__("mscoco14", "/datasets/mscoco14")
-
+        dataset_name = "mscoco14"
+        dataset_root = "/datasets/mscoco14"
+        super(Mscoco14Prepare, self).__init__(dataset_name, dataset_root)
+    
     def prepare_images(self):
 
-        
         os.makedirs(self.target_dataset_root / "train", exist_ok=True)
         
         os.chdir(self.target_dataset_root / "train")
@@ -62,10 +140,11 @@ class Mscoco14Prepare(BaseCOCOPrepare):
             os.system(cmd)
 
 
-
 class Mscoco17Prepare(BaseCOCOPrepare):
     def __init__(self):
-        super(Mscoco17Prepare, self).__init__("mscoco17", "/datasets/mscoco17")
+        dataset_name = "mscoco17"
+        dataset_root = "/datasets/mscoco17"
+        super(Mscoco17Prepare, self).__init__(dataset_name, dataset_root)
 
     def prepare_images(self):
 
@@ -102,8 +181,27 @@ class Mscoco17Prepare(BaseCOCOPrepare):
 class KittiPrepare(BaseCOCOPrepare):
     KITTI_CLASSES = ["Car", "Van", "Truck", "Pedestrian", "Person_sitting", "Cyclist", "Tram", "Misc", "DontCare"]
 
-    def __init__(self):
-        super(KittiPrepare, self).__init__("kitti", "/datasets/kitti")
+    def __init__(self, shift, scale):
+
+        dataset_name = "kitti"
+        dataset_root = "/datasets/kitti"
+
+        if shift != "no":
+            ratio, direction = shift.split("-")
+            ratio = float(ratio)
+            shift = (ratio, direction)
+            dataset_name += f"_shift-{ratio}-{direction}"
+
+        if scale != "no":
+            ratio, direction = scale.split("-")
+            ratio = float(ratio)
+            scale = (ratio, direction)
+            dataset_name += f"_scale-{ratio}-{direction}"
+
+        super(KittiPrepare, self).__init__(dataset_name, dataset_root)
+
+        self.shift = shift
+        self.scale = scale
 
     def prepare_images(self):
 
@@ -141,7 +239,7 @@ class KittiPrepare(BaseCOCOPrepare):
 
         image_root = Path(self.target_dataset_root / "data")
         image_id = 1
-        file_name_to_image_id = {}
+        file_name_to_image_info = {}
         
 
         for p in self._image_paths:
@@ -155,7 +253,7 @@ class KittiPrepare(BaseCOCOPrepare):
                 "width": w,
             }
             labels["images"].append(img_dict)
-            file_name_to_image_id[p] = image_id
+            file_name_to_image_info[p] = (image_id, w, h)
             image_id += 1
 
 
@@ -165,19 +263,28 @@ class KittiPrepare(BaseCOCOPrepare):
             
             df = pd.read_csv(anno_p, sep=" ", index_col=False, header=None)
             file_name = anno_p.with_suffix(".png").name
-            image_id = file_name_to_image_id[file_name]
+            image_id, image_w, image_h = file_name_to_image_info[file_name]
 
 
             for i, row in df.iterrows():
                 
                 left, top, right, bottom = row[4:8]
+                
                 x_top_left, y_top_left, width, height = left, top, right-left, bottom-top
+                bbox = [x_top_left, y_top_left, width, height]
+                
+                if self.shift != "no":
+                    bbox = self.shift_bbox(bbox, image_w, image_h)
+                    
+                if self.scale != "no":
+                    bbox = self.scale_bbox(bbox, image_w, image_h)
+                    
                 category_id = self.KITTI_CLASSES.index(row[0])
 
                 new_anno_dict = {
                     "id": anno_id,
                     "image_id": image_id,
-                    "bbox": [x_top_left, y_top_left, width, height],
+                    "bbox": bbox,
                     "category_id": category_id,
                     "iscrowd": 0,
                     "area": width*height
@@ -194,8 +301,27 @@ class VirtualKittiPrepare(BaseCOCOPrepare):
     KITTI_CLASSES = ["Car", "Van", "Truck", "Pedestrian", "Person_sitting", "Cyclist", "Tram", "Misc", "DontCare"]
     VARIANTS = ["clone", "morning", "sunset", "overcast", "fog", "rain"]
 
-    def __init__(self):
-        super(VirtualKittiPrepare, self).__init__("virtual_kitti", "/datasets/virtual_kitti")
+    def __init__(self, shift, scale):
+
+        dataset_name = "virtual_kitti"
+        dataset_root = "/datasets/virtual_kitti"
+
+        if shift != "no":
+            ratio, direction = shift.split("-")
+            ratio = float(ratio)
+            shift = (ratio, direction)
+            dataset_name += f"_shift-{ratio}-{direction}"
+
+        if scale != "no":
+            ratio, direction = scale.split("-")
+            ratio = float(ratio)
+            scale = (ratio, direction)
+            dataset_name += f"_scale-{ratio}-{direction}"
+
+        super(VirtualKittiPrepare, self).__init__(dataset_name, dataset_root)
+
+        self.shift = shift
+        self.scale = scale
 
     def prepare_images(self):
 
@@ -235,7 +361,7 @@ class VirtualKittiPrepare(BaseCOCOPrepare):
 
         image_root = Path(self.target_dataset_root / "data")
         image_id = 1
-        file_name_to_image_id = {}
+        file_name_to_image_info = {}
         for p in self._image_paths:
 
             w, h = Image.open(image_root / p).size
@@ -247,7 +373,7 @@ class VirtualKittiPrepare(BaseCOCOPrepare):
                 "width": w,
             }
             labels["images"].append(img_dict)
-            file_name_to_image_id[p] = image_id
+            file_name_to_image_info[p] = (image_id, w, h)
             image_id += 1
 
 
@@ -265,17 +391,26 @@ class VirtualKittiPrepare(BaseCOCOPrepare):
                         frame = anno_dict.pop("frame")
 
                         file_name = f"{world}_{variation}_{str(frame).zfill(5)}.png"
-                        image_id = file_name_to_image_id[file_name]
+                        image_id, image_w, image_h = file_name_to_image_info[file_name]
 
                         left, top, right, bottom = anno_dict["l"], anno_dict["t"], anno_dict["r"], anno_dict["b"]
                         x_top_left, y_top_left, width, height = left, top, right-left, bottom-top
+                        
+                        bbox = [x_top_left, y_top_left, width, height]
+
+                        if self.shift != "no":
+                            bbox = self.shift_bbox(bbox, image_w, image_h)
+
+                        if self.scale != "no":
+                            bbox = self.scale_bbox(bbox, image_w, image_h)
+
                         category_id = self.KITTI_CLASSES.index(anno_dict["label"])
 
 
                         new_anno_dict = {
                             "id": anno_id,
                             "image_id": image_id,
-                            "bbox": [x_top_left, y_top_left, width, height],
+                            "bbox": bbox,
                             "category_id": category_id,
                             "iscrowd": 0,
                             "area": width*height
@@ -287,11 +422,29 @@ class VirtualKittiPrepare(BaseCOCOPrepare):
         json.dump(labels, open("labels.json", "w"))
 
 
-
 class SynscapesPrepare(BaseCOCOPrepare):
 
-    def __init__(self):
-        super(SynscapesPrepare, self).__init__("synscapes", "/datasets/synscapes")
+    def __init__(self, shift, scale):
+
+        dataset_name = "synscapes"
+        dataset_root = "/datasets/synscapes"
+
+        if shift != "no":
+            ratio, direction = shift.split("-")
+            ratio = float(ratio)
+            shift = (ratio, direction)
+            dataset_name += f"_shift-{ratio}-{direction}"
+
+        if scale != "no":
+            ratio, direction = scale.split("-")
+            ratio = float(ratio)
+            scale = (ratio, direction)
+            dataset_name += f"_scale-{ratio}-{direction}"
+
+        super(SynscapesPrepare, self).__init__(dataset_name, dataset_root)
+        
+        self.shift = shift
+        self.scale = scale
 
     def prepare_images(self):
 
@@ -350,7 +503,7 @@ class SynscapesPrepare(BaseCOCOPrepare):
                 "width": w,
             }
             labels["images"].append(img_dict)
-            file_name_to_image_info[p] = (image_id, h, w)
+            file_name_to_image_info[p] = (image_id, w, h)
             image_id += 1
 
 
@@ -365,20 +518,29 @@ class SynscapesPrepare(BaseCOCOPrepare):
             truncated_dict = metadata["instance"]["truncated"]
 
             file_name = anno_p.with_suffix(".png").name 
-            image_id, image_height, image_width = file_name_to_image_info[file_name]
+            image_id, image_w, image_h = file_name_to_image_info[file_name]
             for instance_id in bbox2d_dict.keys():
 
                 if class_dict[instance_id] != -1:
                     
-                    x_top_left = bbox2d_dict[instance_id]["xmin"] * image_width
-                    y_top_left = bbox2d_dict[instance_id]["ymin"] * image_height
-                    width = (bbox2d_dict[instance_id]["xmax"] - bbox2d_dict[instance_id]["xmin"]) * image_width
-                    height = (bbox2d_dict[instance_id]["ymax"] - bbox2d_dict[instance_id]["ymin"]) * image_height
+                    x_top_left = bbox2d_dict[instance_id]["xmin"] * image_w
+                    y_top_left = bbox2d_dict[instance_id]["ymin"] * image_h
+                    width = (bbox2d_dict[instance_id]["xmax"] - bbox2d_dict[instance_id]["xmin"]) * image_w
+                    height = (bbox2d_dict[instance_id]["ymax"] - bbox2d_dict[instance_id]["ymin"]) * image_h
+                    
+                    bbox = [x_top_left, y_top_left, width, height]
+                
+                    if self.shift != "no":
+                        bbox = self.shift_bbox(bbox, image_w, image_h)
+
+                    if self.scale != "no":
+                        bbox = self.scale_bbox(bbox, image_w, image_h)
+
                     
                     new_anno_dict = {
                         "id": anno_id, 
                         "image_id": image_id, 
-                        "bbox": [x_top_left, y_top_left, width, height], 
+                        "bbox": bbox, 
                         "category_id": class_dict[instance_id], 
                         "occluded": occluded_dict[instance_id], 
                         "truncated": truncated_dict[instance_id], 
@@ -393,11 +555,29 @@ class SynscapesPrepare(BaseCOCOPrepare):
         json.dump(labels, open("labels.json", "w"))
 
         
-
 class CityscapesPrepare(BaseCOCOPrepare):
 
-    def __init__(self):
-        super(CityscapesPrepare, self).__init__("cityscapes", "/datasets/cityscapes")
+    def __init__(self, shift, scale):
+
+        dataset_name = "cityscapes"
+        dataset_root = "/datasets/cityscapes"
+
+        if shift != "no":
+            ratio, direction = shift.split("-")
+            ratio = float(ratio)
+            shift = (ratio, direction)
+            dataset_name += f"_shift-{ratio}-{direction}"
+
+        if scale != "no":
+            ratio, direction = scale.split("-")
+            ratio = float(ratio)
+            scale = (ratio, direction)
+            dataset_name += f"_scale-{ratio}-{direction}"
+
+        super(CityscapesPrepare, self).__init__(dataset_name, dataset_root)
+
+        self.shift = shift
+        self.scale = scale
 
     def prepare_images(self):
         
@@ -472,7 +652,7 @@ class CityscapesPrepare(BaseCOCOPrepare):
                     "width": w,
                 }
                 labels["images"].append(img_dict)
-                file_name_to_image_info[p] = (image_id, h, w)
+                file_name_to_image_info[p] = (image_id, w, h)
                 image_id += 1
 
 
@@ -495,7 +675,7 @@ class CityscapesPrepare(BaseCOCOPrepare):
                 
                     
                 file_name = anno_p.with_suffix(".png").name.replace("gtBbox3d", "leftImg8bit")
-                image_id, image_height, image_width = file_name_to_image_info[file_name]
+                image_id, image_w, image_h = file_name_to_image_info[file_name]
                 
                 
                 for obj_dict in objects_dict:
@@ -507,11 +687,18 @@ class CityscapesPrepare(BaseCOCOPrepare):
                     bbox_width = x_bottom_right - x_top_left
                     bbox_height = y_bottom_right - y_top_left
                     
+                    bbox = [x_top_left, y_top_left, bbox_width, bbox_height]
+                
+                    if self.shift != "no":
+                        bbox = self.shift_bbox(bbox, image_w, image_h)
+
+                    if self.scale != "no":
+                        bbox = self.scale_bbox(bbox, image_w, image_h)
                     
                     new_anno_dict = {
                         "id": anno_id, 
                         "image_id": image_id, 
-                        "bbox": [x_top_left, y_top_left, bbox_width, bbox_height], 
+                        "bbox": bbox, 
                         "category_id": class_name_to_id[obj_dict["label"]], 
                         "occluded": obj_dict["occlusion"], 
                         "truncated": obj_dict["truncation"], 
@@ -523,3 +710,4 @@ class CityscapesPrepare(BaseCOCOPrepare):
                     anno_id += 1
                     
             json.dump(labels, open("labels.json", "w"))
+

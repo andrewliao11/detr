@@ -20,8 +20,8 @@ import ipdb
 
 class CocoDetection(torchvision.datasets.CocoDetection):
     def __init__(self, img_folder, ann_file, transforms, return_masks, given_class_mapping=None):
-        if given_class_mapping is not None:
-            ipdb.set_trace()
+        #if given_class_mapping is not None:
+        #    ipdb.set_trace()
 
         super(CocoDetection, self).__init__(img_folder, ann_file)
         self._transforms = transforms
