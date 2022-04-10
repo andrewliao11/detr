@@ -22,6 +22,9 @@ world_size: 1
 dist_url: env://          # url used to set up distributed training
 use_wandb: False
 distributed: "???"
+rank: 1
+gpu: 1
+dist_backend: nccl
 
 # training hparams
 lr: 1e-4

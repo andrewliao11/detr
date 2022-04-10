@@ -28,11 +28,13 @@ logger = logging.getLogger(__name__)
 
 @hydra.main(config_path="./config", config_name="base")
 def main(args):
-    
-    logger.info(OmegaConf.to_yaml(args))
-    logger.info(f'Current working directory: {os.getcwd()}')
-    OmegaConf.save(config=args, f='config.yaml')
-    
+
+    if utils.is_main_process():
+        
+        logger.info(OmegaConf.to_yaml(args))
+        logger.info(f'Current working directory: {os.getcwd()}')
+        OmegaConf.save(config=args, f='config.yaml')
+        
 
     utils.init_distributed_mode(args)
     logger.info("git:\n  {}\n".format(utils.get_sha()))
