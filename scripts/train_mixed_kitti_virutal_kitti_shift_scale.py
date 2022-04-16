@@ -1,5 +1,5 @@
 """
-python train_virutal_kitti_shift_scale.py --dataset virtual_kitti --add_dataset kitti --num_gpus4
+python train_mixed_kitti_virutal_kitti_shift_scale.py --dataset mixed_kitti_virtual_kitti --add_dataset kitti --shift up-0.3 --num_gpus 4
 """
 
 import os
@@ -44,7 +44,8 @@ def main():
 
     dataset_path = f"datasets/{dataset_path}/coco_format"
 
-    cmd = f"python -m torch.distributed.launch --nproc_per_node={args.num_gpus} --use_env main.py dataset={args.dataset} dataset.path={dataset_path} add_dataset={args.add_dataset} num_workers=8 batch_size=16 lr_drop=100 epochs=200 use_wandb=True hydra.run.dir=/results"
+    cmd = f"python -m torch.distributed.launch --nproc_per_node={args.num_gpus} --use_env main.py dataset={args.dataset} \
+dataset.path={dataset_path} add_dataset={args.add_dataset} num_workers=8 batch_size=16 lr_drop=100 epochs=200 use_wandb=True hydra.run.dir=/results"
     print(cmd)
     os.system(cmd)
 

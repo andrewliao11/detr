@@ -1,7 +1,7 @@
 import os
 import argparse
 from pathlib import Path
-from prepare_fn import Mscoco14Prepare, Mscoco17Prepare, KittiPrepare, VirtualKittiPrepare, SynscapesPrepare, CityscapesPrepare
+from prepare_fn import Mscoco14Prepare, Mscoco17Prepare, KittiPrepare, VirtualKittiPrepare, SynscapesPrepare, CityscapesPrepare, MixedKittiVirtualKitti
 
 def main():
 
@@ -30,6 +30,11 @@ def main():
             SynscapesPrepare(shift=args.shift, scale=args.scale).prepare()
         elif name == "cityscapes":
             CityscapesPrepare(shift=args.shift, scale=args.scale).prepare()
+        elif name == "mixed_kitti_virtual_kitti":
+            kitti_prepare = KittiPrepare(train_ratio=0.1, shift="no", scale="no")
+            virtual_kitti_prepare = VirtualKittiPrepare(shift=args.shift, scale=args.scale)
+
+            MixedKittiVirtualKitti(kitti_prepare, virtual_kitti_prepare).prepare()
         else:
             raise ValueError
             

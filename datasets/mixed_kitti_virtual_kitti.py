@@ -13,8 +13,7 @@ import datasets.transforms as T
 import ipdb
 
 
-# image size: (1242, 375)
-def make_kitti_transforms(image_set):
+def make_mixed_kitti_virtual_kitti_transforms(image_set):
 
     normalize = T.Compose([
         T.ToTensor(),
@@ -41,6 +40,6 @@ def make_kitti_transforms(image_set):
 def build(image_set, dataset_args, given_class_mapping=None):
     root = os.environ["HOME"] / Path(dataset_args.path)
 
-    assert root.exists(), f"provided Kitti path {root} does not exist"
-    dataset = CocoDetection(root / image_set / "data", root / image_set / "labels.json", transforms=make_kitti_transforms(image_set), return_masks=False, given_class_mapping=given_class_mapping)
+    assert root.exists(), f"provided Mixed Kitti-Virtual Kitti path {root} does not exist"
+    dataset = CocoDetection(root / image_set / "data", root / image_set / "labels.json", transforms=make_mixed_kitti_virtual_kitti_transforms(image_set), return_masks=False, given_class_mapping=given_class_mapping)
     return dataset

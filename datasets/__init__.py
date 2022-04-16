@@ -32,12 +32,15 @@ def build_dataset(image_set, dataset_args, given_class_mapping=None):
     elif dataset_args.name == 'virtual_kitti':
         from .virtual_kitti import build as build_vkitti
         return build_vkitti(image_set, dataset_args, given_class_mapping=given_class_mapping)
-    elif dataset_args.name == 'viper':
-        from .viper import build as build_viper
-        return build_viper(image_set, dataset_args, given_class_mapping=given_class_mapping)
+    #elif dataset_args.name == 'viper':
+    #    from .viper import build as build_viper
+    #    return build_viper(image_set, dataset_args, given_class_mapping=given_class_mapping)
     elif dataset_args.name == 'kitti':
         from .kitti import build as build_kitti
         return build_kitti(image_set, dataset_args, given_class_mapping=given_class_mapping)
+    elif dataset_args.name == 'mixed_kitti_virtual_kitti':
+        from .mixed_kitti_virtual_kitti import build as build_mixed_kitti_virtual_kitti
+        return build_mixed_kitti_virtual_kitti(image_set, dataset_args, given_class_mapping=given_class_mapping)
     elif dataset_args.name == 'synscapes':
         from .synscapes import build as build_synscapes
         return build_synscapes(image_set, dataset_args, given_class_mapping=given_class_mapping)

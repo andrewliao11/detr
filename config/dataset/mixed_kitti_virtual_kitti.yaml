@@ -1,0 +1,7 @@
+
+# dataset parameters
+name: mixed_kitti_virtual_kitti
+path: datasets/mixed_kitti_virtual_kitti/coco_format
+panoptic_path: None
+remove_difficult: False
+masks: False

@@ -10,6 +10,7 @@ import datasets.transforms as T
 import ipdb
 
 
+# img size: (1242, 375)
 def make_vkitti_transforms(image_set):
 
     normalize = T.Compose([
@@ -18,29 +19,26 @@ def make_vkitti_transforms(image_set):
     ])
 
 
-    if image_set == 'train':
+    if image_set == "train":
         return T.Compose([
             T.RandomHorizontalFlip(),
+#            T.RandomResize((1240, 375)),
             normalize,
         ])
 
 
-    if image_set == 'val':
+    if image_set == "val":
         return T.Compose([
+#            T.RandomResize((1240, 375)),
             normalize,
         ])
 
-    raise ValueError(f'unknown {image_set}')
+    raise ValueError(f"unknown {image_set}")
 
 
 def build(image_set, dataset_args, given_class_mapping=None):
-    root = os.environ['HOME'] / Path(dataset_args.path)
+    root = os.environ["HOME"] / Path(dataset_args.path)
 
-    assert root.exists(), f'provided VirtualKitti path {root} does not exist'
-    dataset = CocoDetection(root / "data", root / "labels.json", transforms=make_vkitti_transforms(image_set), return_masks=False, given_class_mapping=given_class_mapping)
-    train_ratio = 0.7
-
-    n_train = int(len(dataset)*train_ratio)
-    lengths = [n_train, len(dataset) - n_train]
-    train_dataset, val_dataset = random_split(dataset, lengths, generator=torch.Generator().manual_seed(42))
+    assert root.exists(), f"provided VirtualKitti path {root} does not exist"
+    dataset = CocoDetection(root / image_set / "data", root / image_set / "labels.json", transforms=make_vkitti_transforms(image_set), return_masks=False, given_class_mapping=given_class_mapping)
     return dataset

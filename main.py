@@ -2,6 +2,7 @@
 import os
 import hydra
 import datetime
+import wandb
 import json
 import random
 import time
@@ -43,14 +44,19 @@ def main(args):
         assert args.dataset.masks, "Frozen training is meant for segmentation only"
     
 
-    if args.use_wandb and utils.is_main_process():
-        import wandb
+    if utils.is_main_process():
+        
         ct = datetime.datetime.now()
+        kwargs = {}
+        if not args.use_wandb:
+            kwargs["mode"] = "disabled"
+
         wandb.init(
             project=f"label-translation-detr-{args.dataset.name}", 
             entity="andrew-liao", 
             name=f"{ct.year}.{ct.month}.{ct.day}.{ct.hour}.{ct.minute}.{ct.second}", 
-            config=args
+            config=args, 
+            **kwargs
         )
 
     device = torch.device(args.device)
@@ -207,9 +213,9 @@ def main(args):
             log_stats.update({f'add_test/{k}': v for k, v in add_test_stats.items()})
 
 
-        if args.use_wandb and utils.is_main_process():
+        if utils.is_main_process():
             wandb.log(log_stats)
-            wandb.watch(model)
+            #wandb.watch(model)
             
         
         if utils.is_main_process():
