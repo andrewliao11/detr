@@ -17,10 +17,12 @@ def main():
         if name == "mscoco14":
             assert args.shift == "no"
             assert args.scale == "no"
+
             Mscoco14Prepare().prepare()
         elif name == "mscoco17":
             assert args.shift == "no"
             assert args.scale == "no"
+
             Mscoco17Prepare().prepare()
         elif name == "kitti":
             KittiPrepare(shift=args.shift, scale=args.scale).prepare()
@@ -31,6 +33,11 @@ def main():
         elif name == "cityscapes":
             CityscapesPrepare(shift=args.shift, scale=args.scale).prepare()
         elif name == "mixed_kitti_virtual_kitti":
+            kitti_prepare = KittiPrepare(shift="no", scale="no")
+            virtual_kitti_prepare = VirtualKittiPrepare(shift=args.shift, scale=args.scale)
+
+            MixedKittiVirtualKitti(kitti_prepare, virtual_kitti_prepare).prepare()
+        elif name == "10to1_mixed_kitti_virtual_kitti":
             kitti_prepare = KittiPrepare(train_ratio=0.1, shift="no", scale="no")
             virtual_kitti_prepare = VirtualKittiPrepare(shift=args.shift, scale=args.scale)
 

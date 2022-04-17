@@ -635,7 +635,7 @@ class MixedKittiVirtualKitti(BaseCOCOPrepare):
 
 class SynscapesPrepare(BaseCOCOPrepare):
 
-    def __init__(self, shift, scale):
+    def __init__(self, shift, scale, train_ratio=0.7, image_prefix=""):
 
         dataset_name = "synscapes"
         dataset_root = "/datasets/synscapes"
@@ -656,122 +656,160 @@ class SynscapesPrepare(BaseCOCOPrepare):
         
         self.shift = shift
         self.scale = scale
+        self.train_ratio = train_ratio
+        self.image_prefix = image_prefix
+
+    def _convert_source_path_to_target_name(self, src_p):
+        return f"{self.image_prefix}{src_p.name}"
 
     def prepare_splits_if_needed(self):
-        ipdb.set_trace()
-        pass
         
+        image_names = [self._convert_source_path_to_target_name(p) for p in (self.dataset_root / "img/rgb").glob("*.png")]
+        image_names.sort()
+        random.Random(SEED).shuffle(image_names)
+        n = len(image_names)
+        
+        train_image_names = image_names[:int(n*self.train_ratio)]
+        val_image_names = image_names[int(n*self.train_ratio):]
+
+        json.dump({
+            "train": train_image_names, 
+            "val": val_image_names
+        }, open(self.target_dataset_root / "split.json", "w"))
+    
     def prepare_images(self):
 
-        os.makedirs(self.target_dataset_root / "data", exist_ok=True)
-        os.chdir(self.target_dataset_root / "data")
+        split_file = json.load((self.target_dataset_root / "split.json").open())
+        image_names = {}
 
-        image_paths = []
-        for p in Path(self.dataset_root / "img/rgb").glob(f"*.png"):
 
-            if p.name.startswith("."):
-                continue
+        def _prepare_images_split(split):
+            os.makedirs(self.target_dataset_root / split / "data", exist_ok=True)
+            os.chdir(self.target_dataset_root / split / "data")
 
-            tgt_name = p.name
-            cmd = f"ln -s {p} {tgt_name}"
-            if not Path(tgt_name).exists():
-                os.system(cmd)
-            image_paths.append(tgt_name)
+            image_names[split] = []
+            for p in tqdm(Path(self.dataset_root / "img/rgb").glob("*.png"), desc="Creating soft link"):
+                if p.name.startswith("."):
+                    continue
 
-        self._image_paths = image_paths
+                tgt_name = self._convert_source_path_to_target_name(p)
+                if tgt_name in split_file[split]:
+                    
+                    cmd = f"ln -s {p} {tgt_name}"
+                    if not Path(tgt_name).exists():
+                        os.system(cmd)
+                    
+                    image_names[split].append(tgt_name)
+
+        _prepare_images_split("train")
+        _prepare_images_split("val")
+        self._image_names = image_names
 
     def prepare_labels(self):
+        assert hasattr(self, "_image_names"), "Need to call self.prepare_images first"
         
-        assert hasattr(self, "_image_paths"), "Need to call self.prepare_images first"
-
-        os.chdir(self.target_dataset_root)
-
-        
-        # Use Cityscape id
-        labels = {
-            "info": {},
-            "licenses": [],
-            "categories": [{
-                "id": l.id,
-                "name": l.name,
-                "supercategory": "all"
-            } for l in CITYSCAPES_LABELS if l.id  != -1],
-            "images": [],
-            "annotations": []
-        }
-
-        image_root = Path(self.target_dataset_root / "data")
-        image_id = 1
-        file_name_to_image_info= {}
-
-        for p in self._image_paths:
-
-            if p.startswith("."):
-                continue
-
-            w, h = Image.open(image_root / p).size
-            img_dict = {
-                "id": image_id,
-                "license": 1,
-                "file_name": p,
-                "height": h,
-                "width": w,
-            }
-            labels["images"].append(img_dict)
-            file_name_to_image_info[p] = (image_id, w, h)
-            image_id += 1
-
-
-        anno_id = 1
-        for anno_p in tqdm(Path(self.dataset_root / "meta").glob("*.json"), desc="Process synscape"):
+        def _prepare_labels_split(split):
+            os.chdir(self.target_dataset_root / split)
             
-            metadata = json.load(open(anno_p))
-            bbox2d_dict = metadata["instance"]["bbox2d"]
-            class_dict = metadata["instance"]["class"]
-            occluded_dict = metadata["instance"]["occluded"]
-            truncated_dict = metadata["instance"]["truncated"]
+            # Use Cityscape id
+            labels = {
+                "info": {},
+                "licenses": [],
+                "categories": [{
+                    "id": l.id,
+                    "name": l.name,
+                    "supercategory": "all"
+                } for l in CITYSCAPES_LABELS if l.id  != -1],
+                "images": [],
+                "annotations": []
+            }
 
-            file_name = anno_p.with_suffix(".png").name 
-            image_id, image_w, image_h = file_name_to_image_info[file_name]
-            for instance_id in bbox2d_dict.keys():
+            def __construct_image_dict():
 
-                if class_dict[instance_id] != -1:
-                    
-                    x_top_left = bbox2d_dict[instance_id]["xmin"] * image_w
-                    y_top_left = bbox2d_dict[instance_id]["ymin"] * image_h
-                    width = (bbox2d_dict[instance_id]["xmax"] - bbox2d_dict[instance_id]["xmin"]) * image_w
-                    height = (bbox2d_dict[instance_id]["ymax"] - bbox2d_dict[instance_id]["ymin"]) * image_h
-                    
-                    bbox = [x_top_left, y_top_left, width, height]
+                image_root = Path(self.target_dataset_root / split / "data")
                 
-                    if self.shift != "no":
-                        bbox = self.shift_bbox(bbox, image_w, image_h)
+                image_id = 1
+                file_name_to_image_info = {}
+                for p in self._image_names[split]:
 
-                    if self.scale != "no":
-                        bbox = self.scale_bbox(bbox, image_w, image_h)
-
-                    
-                    new_anno_dict = {
-                        "id": anno_id, 
-                        "image_id": image_id, 
-                        "bbox": bbox, 
-                        "category_id": class_dict[instance_id], 
-                        "occluded": occluded_dict[instance_id], 
-                        "truncated": truncated_dict[instance_id], 
-                        "iscrowd": 0, 
-                        "area": width*height
+                    w, h = Image.open(image_root / p).size
+                    img_dict = {
+                        "id": image_id,
+                        "license": 1,
+                        "file_name": p,
+                        "height": h,
+                        "width": w,
                     }
+                    labels["images"].append(img_dict)
+                    file_name_to_image_info[p] = (image_id, w, h)
+                    image_id += 1
+                return file_name_to_image_info
 
-                    labels["annotations"].append(new_anno_dict)
-                    anno_id += 1
+            def __construct_annotations_dict(file_name_to_image_info):
+                
+                anno_id = 1
+                for anno_p in tqdm(Path(self.dataset_root / "meta").glob("*.json"), desc="Process synscape"):
+    
+                    #orig_p = anno_p.with_suffix(".png")
+                    orig_p = Path(anno_p.replace(".json", "png").replace("meta", "img/rgb"))
+                    file_name = self._convert_source_path_to_target_name(orig_p)
 
+                    if file_name in self._image_names[split]:
 
-        json.dump(labels, open("labels.json", "w"))
+                        image_id, image_w, image_h = file_name_to_image_info[file_name]
+
+                        metadata = json.load(open(anno_p))
+                        bbox2d_dict = metadata["instance"]["bbox2d"]
+                        class_dict = metadata["instance"]["class"]
+                        occluded_dict = metadata["instance"]["occluded"]
+                        truncated_dict = metadata["instance"]["truncated"]
+
+                        for instance_id in bbox2d_dict.keys():
+
+                            if class_dict[instance_id] != -1:
+                                
+                                x_top_left = bbox2d_dict[instance_id]["xmin"] * image_w
+                                y_top_left = bbox2d_dict[instance_id]["ymin"] * image_h
+                                width = (bbox2d_dict[instance_id]["xmax"] - bbox2d_dict[instance_id]["xmin"]) * image_w
+                                height = (bbox2d_dict[instance_id]["ymax"] - bbox2d_dict[instance_id]["ymin"]) * image_h
+                                
+                                bbox = [x_top_left, y_top_left, width, height]
+                            
+                                if self.shift != "no":
+                                    bbox = self.shift_bbox(bbox, image_w, image_h)
+
+                                if self.scale != "no":
+                                    bbox = self.scale_bbox(bbox, image_w, image_h)
+
+                                
+                                new_anno_dict = {
+                                    "id": anno_id, 
+                                    "image_id": image_id, 
+                                    "bbox": bbox, 
+                                    "category_id": class_dict[instance_id], 
+                                    "occluded": occluded_dict[instance_id], 
+                                    "truncated": truncated_dict[instance_id], 
+                                    "iscrowd": 0, 
+                                    "area": width*height
+                                }
+
+                                labels["annotations"].append(new_anno_dict)
+                                anno_id += 1
+
+            file_name_to_image_info = __construct_image_dict()
+            __construct_annotations_dict(file_name_to_image_info)
+            return labels
+
+        train_labels = _prepare_labels_split("train")
+        json.dump(train_labels, open(self.target_dataset_root / "train" / "labels.json", "w"))
+
+        val_labels = _prepare_labels_split("val")
+        json.dump(val_labels, open(self.target_dataset_root / "val" / "labels.json", "w"))
 
         
 class CityscapesPrepare(BaseCOCOPrepare):
 
-    def __init__(self, shift, scale):
+    def __init__(self, shift, scale, image_prefix=""):
 
         dataset_name = "cityscapes"
         dataset_root = "/datasets/cityscapes"
@@ -792,6 +830,13 @@ class CityscapesPrepare(BaseCOCOPrepare):
 
         self.shift = shift
         self.scale = scale
+        self.image_prefix = image_prefix
+
+    def _convert_source_path_to_target_name(self, src_p):
+        return f"{self.image_prefix}{src_p.name}"
+
+    def prepare_splits_if_needed(self):
+        pass
 
     def prepare_images(self):
         
@@ -799,14 +844,12 @@ class CityscapesPrepare(BaseCOCOPrepare):
             "train": [], 
             "val": []
         }
-        for split in ["train", "val"]:
+
+        def _prepare_images_split(split):
             os.makedirs(self.target_dataset_root / f"{split}/data", exist_ok=True)
             os.chdir(self.target_dataset_root / f"{split}/data")
 
             for p in Path(self.dataset_root / f"leftImg8bit/{split}").glob(f"*/*.png"):
-
-                #if p.name.startswith("."):
-                #    continue
 
                 tgt_name = p.name
                 cmd = f"ln -s {p} {tgt_name}"
@@ -814,6 +857,9 @@ class CityscapesPrepare(BaseCOCOPrepare):
                     os.system(cmd)
                 image_paths[split].append(tgt_name)
 
+
+        _prepare_images_split("train")
+        _prepare_images_split("val")
         self._image_paths = image_paths
 
     def prepare_labels(self):
@@ -829,8 +875,7 @@ class CityscapesPrepare(BaseCOCOPrepare):
         
         assert hasattr(self, "_image_paths"), "Need to call self.prepare_images first"
         
-        
-        for split in ["train", "val"]:
+        def _prepare_labels_split(split):
 
             os.chdir(self.target_dataset_root / split)
             
@@ -848,79 +893,85 @@ class CityscapesPrepare(BaseCOCOPrepare):
             
             class_name_to_id = {i["name"]: i["id"] for i in labels["categories"]}
 
-            image_root = Path(self.target_dataset_root / f"{split}/data")
-            image_id = 1
-            file_name_to_image_info= {}
 
-            for p in self._image_paths[split]:
+            def __construct_image_dict():
+                image_root = Path(self.target_dataset_root / f"{split}/data")
+                image_id = 1
+                file_name_to_image_info= {}
 
-                #if p.startswith("."):
-                #    continue
+                for p in self._image_paths[split]:
 
-                w, h = Image.open(image_root / p).size
-                img_dict = {
-                    "id": image_id,
-                    "license": 1,
-                    "file_name": p,
-                    "height": h,
-                    "width": w,
-                }
-                labels["images"].append(img_dict)
-                file_name_to_image_info[p] = (image_id, w, h)
-                image_id += 1
-
-
-            anno_id = 1
-            for anno_p in tqdm(Path(self.dataset_root / f"gtBbox3d/{split}").glob("*/*.json"), desc=f"Processing cityscape {split}"):
-
-                metadata = json.load(open(anno_p))
-                
-                camera = Camera(fx=metadata["sensor"]["fx"],
-                        fy=metadata["sensor"]["fy"],
-                        u0=metadata["sensor"]["u0"],
-                        v0=metadata["sensor"]["v0"],
-                        sensor_T_ISO_8855=metadata["sensor"]["sensor_T_ISO_8855"]
-                )
-
-                box3d_annotation = Box3dImageTransform(camera=camera)
-
-                    
-                objects_dict = metadata["objects"]
-                
-                    
-                file_name = anno_p.with_suffix(".png").name.replace("gtBbox3d", "leftImg8bit")
-                image_id, image_w, image_h = file_name_to_image_info[file_name]
-                
-                
-                for obj_dict in objects_dict:
-                    obj = CsBbox3d()
-                    obj.fromJsonText(obj_dict)
-
-                    
-                    x_top_left, y_top_left, x_bottom_right, y_bottom_right = obj.bbox_2d.bbox_modal
-                    bbox_width = x_bottom_right - x_top_left
-                    bbox_height = y_bottom_right - y_top_left
-                    
-                    bbox = [x_top_left, y_top_left, bbox_width, bbox_height]
-                
-                    if self.shift != "no":
-                        bbox = self.shift_bbox(bbox, image_w, image_h)
-
-                    if self.scale != "no":
-                        bbox = self.scale_bbox(bbox, image_w, image_h)
-                    
-                    new_anno_dict = {
-                        "id": anno_id, 
-                        "image_id": image_id, 
-                        "bbox": bbox, 
-                        "category_id": class_name_to_id[obj_dict["label"]], 
-                        "occluded": obj_dict["occlusion"], 
-                        "truncated": obj_dict["truncation"], 
-                        "iscrowd": 0, 
-                        "area": bbox_width*bbox_height
+                    w, h = Image.open(image_root / p).size
+                    img_dict = {
+                        "id": image_id,
+                        "license": 1,
+                        "file_name": p,
+                        "height": h,
+                        "width": w,
                     }
+                    labels["images"].append(img_dict)
+                    file_name_to_image_info[p] = (image_id, w, h)
+                    image_id += 1
 
-                    labels["annotations"].append(new_anno_dict)
-                    anno_id += 1
+                return file_name_to_image_info
+
+            def __construct_annotations_dict(file_name_to_image_info):
+                anno_id = 1
+                for anno_p in tqdm(Path(self.dataset_root / f"gtBbox3d/{split}").glob("*/*.json"), desc=f"Processing cityscape {split}"):
+
+                    metadata = json.load(open(anno_p))
                     
-            json.dump(labels, open("labels.json", "w"))
+                    camera = Camera(fx=metadata["sensor"]["fx"],
+                            fy=metadata["sensor"]["fy"],
+                            u0=metadata["sensor"]["u0"],
+                            v0=metadata["sensor"]["v0"],
+                            sensor_T_ISO_8855=metadata["sensor"]["sensor_T_ISO_8855"]
+                    )
+
+                    box3d_annotation = Box3dImageTransform(camera=camera)    
+                    objects_dict = metadata["objects"]
+                        
+                    file_name = anno_p.with_suffix(".png").name.replace("gtBbox3d", "leftImg8bit")
+                    image_id, image_w, image_h = file_name_to_image_info[file_name]
+                    
+                    for obj_dict in objects_dict:
+                        obj = CsBbox3d()
+                        obj.fromJsonText(obj_dict)
+
+                        
+                        x_top_left, y_top_left, x_bottom_right, y_bottom_right = obj.bbox_2d.bbox_modal
+                        bbox_width = x_bottom_right - x_top_left
+                        bbox_height = y_bottom_right - y_top_left
+                        
+                        bbox = [x_top_left, y_top_left, bbox_width, bbox_height]
+                    
+                        if self.shift != "no":
+                            bbox = self.shift_bbox(bbox, image_w, image_h)
+
+                        if self.scale != "no":
+                            bbox = self.scale_bbox(bbox, image_w, image_h)
+                        
+                        new_anno_dict = {
+                            "id": anno_id, 
+                            "image_id": image_id, 
+                            "bbox": bbox, 
+                            "category_id": class_name_to_id[obj_dict["label"]], 
+                            "occluded": obj_dict["occlusion"], 
+                            "truncated": obj_dict["truncation"], 
+                            "iscrowd": 0, 
+                            "area": bbox_width*bbox_height
+                        }
+
+                        labels["annotations"].append(new_anno_dict)
+                        anno_id += 1
+                
+            file_name_to_image_info = __construct_image_dict()
+            __construct_annotations_dict(file_name_to_image_info)
+            return labels
+                    
+
+        train_labels = _prepare_labels_split("train")
+        json.dump(train_labels, open(self.target_dataset_root / "train" / "labels.json", "w"))
+
+        val_labels = _prepare_labels_split("val")
+        json.dump(val_labels, open(self.target_dataset_root / "val" / "labels.json", "w"))
