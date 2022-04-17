@@ -35,7 +35,7 @@ class BaseCOCOPrepare():
     def prepare_splits_if_needed(self):
         pass
 
-    def scale_bbox(self, bbox, image_w, image_h):
+    def _scale_bbox(self, bbox, image_w, image_h):
         ratio, direction = self.scale
         assert ratio >= 0., "ratio need to be positive"
         assert direction in ["up", "down"], "direction need to be either up or down"
@@ -78,7 +78,7 @@ class BaseCOCOPrepare():
         new_bbox_height = y_bottom_right - y_top_left
         return [x_top_left, y_top_left, new_bbox_width, new_bbox_height]
 
-    def shift_bbox(self, bbox, image_w, image_h):
+    def _shift_bbox(self, bbox, image_w, image_h):
         ratio, direction = self.shift
         assert ratio >= 0., "ratio need to be positive"
         assert direction in ["left", "right", "up", "down"], "direction need to be either left, right, top, bottom"
@@ -113,6 +113,45 @@ class BaseCOCOPrepare():
         new_bbox_width = x_bottom_right - x_top_left
             
         return [x_top_left, y_top_left, new_bbox_width, new_bbox_height]
+
+    def shift_or_scale_bbox(self, bbox, image_w, image_h):
+        if self.shift != "no":
+            bbox = self._shift_bbox(bbox, image_w, image_h)
+
+        if self.scale != "no":
+            bbox = self._scale_bbox(bbox, image_w, image_h)
+
+        return bbox
+
+    def decode_shift_and_scale_str(self, shift, scale):
+
+        if shift != "no":
+            ratio, direction = shift.split("-")
+            ratio = float(ratio)
+            shift = (ratio, direction)
+            
+            dataset_name += f"_shift-{ratio}-{direction}"
+
+        if scale != "no":
+            ratio, direction = scale.split("-")
+            ratio = float(ratio)
+            scale = (ratio, direction)
+            dataset_name += f"_scale-{ratio}-{direction}"
+
+        self.shift = shift
+        self.scale = scale
+
+    def change_dataset_name(self, dataset_name):
+        if self.shift != "no":
+            ratio, direction = self.shift
+            dataset_name += f"_shift-{ratio}-{direction}"
+
+        if self.scale != "no":
+            
+            ratio, direction = self.scale
+            dataset_name += f"_scale-{ratio}-{direction}"
+
+        return dataset_name
 
 
 class Mscoco14Prepare(BaseCOCOPrepare):
@@ -197,22 +236,11 @@ class KittiPrepare(BaseCOCOPrepare):
         dataset_name = "kitti"
         dataset_root = "/datasets/kitti"
 
-        if shift != "no":
-            ratio, direction = shift.split("-")
-            ratio = float(ratio)
-            shift = (ratio, direction)
-            dataset_name += f"_shift-{ratio}-{direction}"
-
-        if scale != "no":
-            ratio, direction = scale.split("-")
-            ratio = float(ratio)
-            scale = (ratio, direction)
-            dataset_name += f"_scale-{ratio}-{direction}"
-
+        self.decode_shift_and_scale_str(shift, scale)
+        dataset_name = self.change_dataset_name(dataset_name)
+        
         super(KittiPrepare, self).__init__(dataset_name, dataset_root)
 
-        self.shift = shift
-        self.scale = scale
         self.train_ratio = train_ratio
         self.image_prefix = image_prefix
 
@@ -319,12 +347,7 @@ class KittiPrepare(BaseCOCOPrepare):
 
                             x_top_left, y_top_left, width, height = left, top, right-left, bottom-top
                             bbox = [x_top_left, y_top_left, width, height]
-
-                            if self.shift != "no":
-                                bbox = self.shift_bbox(bbox, image_w, image_h)
-
-                            if self.scale != "no":
-                                bbox = self.scale_bbox(bbox, image_w, image_h)
+                            bbox = self.shift_or_scale_bbox(bbox, image_w, image_h)
 
                             category_id = self.KITTI_CLASSES.index(row[0])
 
@@ -361,22 +384,11 @@ class VirtualKittiPrepare(BaseCOCOPrepare):
         dataset_name = "virtual_kitti"
         dataset_root = "/datasets/virtual_kitti"
 
-        if shift != "no":
-            ratio, direction = shift.split("-")
-            ratio = float(ratio)
-            shift = (ratio, direction)
-            dataset_name += f"_shift-{ratio}-{direction}"
-
-        if scale != "no":
-            ratio, direction = scale.split("-")
-            ratio = float(ratio)
-            scale = (ratio, direction)
-            dataset_name += f"_scale-{ratio}-{direction}"
+        self.decode_shift_and_scale_str(shift, scale)
+        dataset_name = self.change_dataset_name(dataset_name)
 
         super(VirtualKittiPrepare, self).__init__(dataset_name, dataset_root)
 
-        self.shift = shift
-        self.scale = scale
         self.train_ratio = train_ratio
         self.image_prefix = image_prefix
 
@@ -640,22 +652,11 @@ class SynscapesPrepare(BaseCOCOPrepare):
         dataset_name = "synscapes"
         dataset_root = "/datasets/synscapes"
 
-        if shift != "no":
-            ratio, direction = shift.split("-")
-            ratio = float(ratio)
-            shift = (ratio, direction)
-            dataset_name += f"_shift-{ratio}-{direction}"
-
-        if scale != "no":
-            ratio, direction = scale.split("-")
-            ratio = float(ratio)
-            scale = (ratio, direction)
-            dataset_name += f"_scale-{ratio}-{direction}"
+        self.decode_shift_and_scale_str(shift, scale)
+        dataset_name = self.change_dataset_name(dataset_name)
 
         super(SynscapesPrepare, self).__init__(dataset_name, dataset_root)
         
-        self.shift = shift
-        self.scale = scale
         self.train_ratio = train_ratio
         self.image_prefix = image_prefix
 
@@ -681,7 +682,6 @@ class SynscapesPrepare(BaseCOCOPrepare):
 
         split_file = json.load((self.target_dataset_root / "split.json").open())
         image_names = {}
-
 
         def _prepare_images_split(split):
             os.makedirs(self.target_dataset_root / split / "data", exist_ok=True)
@@ -748,7 +748,7 @@ class SynscapesPrepare(BaseCOCOPrepare):
             def __construct_annotations_dict(file_name_to_image_info):
                 
                 anno_id = 1
-                for anno_p in tqdm(Path(self.dataset_root / "meta").glob("*.json"), desc="Process synscape"):
+                for anno_p in tqdm(Path(self.dataset_root / "meta").glob("*.json"), desc=f"Process synscape {split}"):
     
                     #orig_p = anno_p.with_suffix(".png")
                     orig_p = Path(anno_p.replace(".json", "png").replace("meta", "img/rgb"))
@@ -774,13 +774,7 @@ class SynscapesPrepare(BaseCOCOPrepare):
                                 height = (bbox2d_dict[instance_id]["ymax"] - bbox2d_dict[instance_id]["ymin"]) * image_h
                                 
                                 bbox = [x_top_left, y_top_left, width, height]
-                            
-                                if self.shift != "no":
-                                    bbox = self.shift_bbox(bbox, image_w, image_h)
-
-                                if self.scale != "no":
-                                    bbox = self.scale_bbox(bbox, image_w, image_h)
-
+                                bbox = self.shift_or_scale_bbox(bbox, image_w, image_h)
                                 
                                 new_anno_dict = {
                                     "id": anno_id, 
@@ -814,22 +808,11 @@ class CityscapesPrepare(BaseCOCOPrepare):
         dataset_name = "cityscapes"
         dataset_root = "/datasets/cityscapes"
 
-        if shift != "no":
-            ratio, direction = shift.split("-")
-            ratio = float(ratio)
-            shift = (ratio, direction)
-            dataset_name += f"_shift-{ratio}-{direction}"
-
-        if scale != "no":
-            ratio, direction = scale.split("-")
-            ratio = float(ratio)
-            scale = (ratio, direction)
-            dataset_name += f"_scale-{ratio}-{direction}"
+        self.decode_shift_and_scale_str(shift, scale)
+        dataset_name = self.change_dataset_name(dataset_name)
 
         super(CityscapesPrepare, self).__init__(dataset_name, dataset_root)
 
-        self.shift = shift
-        self.scale = scale
         self.image_prefix = image_prefix
 
     def _convert_source_path_to_target_name(self, src_p):
@@ -944,12 +927,7 @@ class CityscapesPrepare(BaseCOCOPrepare):
                         bbox_height = y_bottom_right - y_top_left
                         
                         bbox = [x_top_left, y_top_left, bbox_width, bbox_height]
-                    
-                        if self.shift != "no":
-                            bbox = self.shift_bbox(bbox, image_w, image_h)
-
-                        if self.scale != "no":
-                            bbox = self.scale_bbox(bbox, image_w, image_h)
+                        bbox = self.shift_or_scale_bbox(bbox, image_w, image_h)
                         
                         new_anno_dict = {
                             "id": anno_id, 
@@ -975,3 +953,105 @@ class CityscapesPrepare(BaseCOCOPrepare):
 
         val_labels = _prepare_labels_split("val")
         json.dump(val_labels, open(self.target_dataset_root / "val" / "labels.json", "w"))
+
+
+class MixedDatasetsPrepare(BaseCOCOPrepare):
+    """Mix two datasets. The train and val splits follow their original splits
+    """
+
+    def __init__(self, datasetA, datasetB):
+
+        dataset_name = f"mixed_{datasetA.dataset_name}_{datasetB.dataset_name}"
+        super(MixedDatasetsPrepare(datasetA, datasetB), self).__init__(dataset_name, None)
+
+        self.datasetA = datasetA
+        self.datasetB = datasetB
+        
+        self.datasetA.prepare()
+        self.datasetB.prepare()
+
+    def prepare_splits_if_needed(self):
+
+        datasetA_splits = json.load((self.datasetA.target_dataset_root / "split.json").open())
+        datasetB_splits = json.load((self.datasetB.target_dataset_root / "split.json").open())
+        
+        splits = {
+            "train": [], 
+            "val": []
+        }
+        for split in ["train", "val"]:
+            splits[split].extend([f"{self.datasetA.dataset_name}-{v}" for v in datasetA_splits[split]])
+            splits[split].extend([f"{self.datasetB.dataset_name}-{v}" for v in datasetB_splits[split]])
+            
+        json.dump(splits, open(self.target_dataset_root / "split.json", "w"))
+        
+    def prepare_images(self):
+
+        split_file = json.load((self.target_dataset_root / "split.json").open())
+
+        image_names = {}
+
+        def _prepare_images_split(split):
+
+            os.makedirs(self.target_dataset_root / split / "data", exist_ok=True)
+            os.chdir(self.target_dataset_root / split / "data")
+            
+            image_names[split] = []
+
+            for p in (self.datasetA.target_dataset_root / split / "data").glob("*.png"):
+                tgt_name = f"{self.datasetA.dataset_name}-{p.name}"
+                cmd = f"ln -s {p} {tgt_name}"
+                if not Path(tgt_name).exists():
+                    os.system(cmd)
+                image_names[split].append(tgt_name)
+            
+            for p in (self.datasetB.target_dataset_root / split / "data").glob("*.png"):
+                tgt_name = f"{self.datasetB.dataset_name}-{p.name}"
+                cmd = f"ln -s {p} {tgt_name}"
+                if not Path(tgt_name).exists():
+                    os.system(cmd)
+                image_names[split].append(tgt_name)
+                
+        _prepare_images_split("train")
+        _prepare_images_split("val")
+        self._image_names = image_names
+
+    def prepare_labels(self):
+
+        def _prepare_labels_split(split):
+            
+            os.chdir(self.target_dataset_root / split)
+
+            
+            datasetA_labels = json.load(open(self.datasetA.target_dataset_root / split / "labels.json"))
+            labels = copy.deepcopy(datasetA_labels)
+            for img_dict in labels["images"]:
+                name = img_dict["file_name"]
+                img_dict["file_name"] = f"{self.datasetA.dataset_name}-{name}"
+
+            # +1 to ensure no overlap
+            image_id_offset = max([i["id"] for i in labels["images"]]) + 1
+
+            datasetB_labels = json.load(open(self.datasetB.target_dataset_root / split / "labels.json"))
+            for img_dict in datasetB_labels["images"]:
+                name = img_dict["file_name"]
+                img_dict["file_name"] = f"{self.datasetB.dataset_name}-{name}"
+                img_dict["id"] = image_id_offset + img_dict["id"]
+
+                labels["images"].append(img_dict)
+
+            # +1 to ensure no overlap
+            anno_id_offset = max([i["id"] for i in labels["annotations"]]) + 1
+            for anno_dict in virtual_kitti_labels["annotations"]:
+                anno_dict["image_id"] = image_id_offset + anno_dict["image_id"]
+                anno_dict["id"] = anno_id_offset + anno_dict["id"]
+                labels["annotations"].append(anno_dict)
+
+            return labels
+
+        train_labels = _prepare_labels_split("train")
+        json.dump(train_labels, open(self.target_dataset_root / "train" / "labels.json", "w"))
+
+        val_labels = _prepare_labels_split("val")
+        json.dump(val_labels, open(self.target_dataset_root / "val" / "labels.json", "w"))
+

@@ -1,7 +1,7 @@
 import os
 import argparse
 from pathlib import Path
-from prepare_fn import Mscoco14Prepare, Mscoco17Prepare, KittiPrepare, VirtualKittiPrepare, SynscapesPrepare, CityscapesPrepare, MixedKittiVirtualKitti
+from prepare_fn import Mscoco14Prepare, Mscoco17Prepare, KittiPrepare, VirtualKittiPrepare, SynscapesPrepare, CityscapesPrepare, MixedDatasetsPrepare
 
 def main():
 
@@ -36,12 +36,17 @@ def main():
             kitti_prepare = KittiPrepare(shift="no", scale="no")
             virtual_kitti_prepare = VirtualKittiPrepare(shift=args.shift, scale=args.scale)
 
-            MixedKittiVirtualKitti(kitti_prepare, virtual_kitti_prepare).prepare()
+            MixedDatasetsPrepare(kitti_prepare, virtual_kitti_prepare).prepare()
         elif name == "10to1_mixed_kitti_virtual_kitti":
             kitti_prepare = KittiPrepare(train_ratio=0.1, shift="no", scale="no")
             virtual_kitti_prepare = VirtualKittiPrepare(shift=args.shift, scale=args.scale)
 
-            MixedKittiVirtualKitti(kitti_prepare, virtual_kitti_prepare).prepare()
+            MixedDatasetsPrepare(kitti_prepare, virtual_kitti_prepare).prepare()
+        elif name == "mixed_cityscapes_synscapes":
+            synscapes_prepare = SynscapesPrepare(shift="no", scale="no")
+            cityscapes_prepare = CityscapesPrepare(shift=args.shift, scale=args.scale)
+
+            MixedDatasetsPrepare(synscapes_prepare, cityscapes_prepare).prepare()
         else:
             raise ValueError
             
