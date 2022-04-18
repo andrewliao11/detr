@@ -1,4 +1,5 @@
 import os
+import time
 import argparse
 from pathlib import Path
 from prepare_fn import Mscoco14Prepare, Mscoco17Prepare, KittiPrepare, VirtualKittiPrepare, SynscapesPrepare, CityscapesPrepare, MixedDatasetsPrepare
@@ -12,6 +13,8 @@ def main():
     args = parser.parse_args()
 
     print(args.datasets)
+    t1 = time.time()
+
     for name in args.datasets:
         print(f"Process {name}")
         if name == "mscoco14":
@@ -43,13 +46,16 @@ def main():
 
             MixedDatasetsPrepare(kitti_prepare, virtual_kitti_prepare).prepare()
         elif name == "mixed_cityscapes_synscapes":
-            synscapes_prepare = SynscapesPrepare(shift="no", scale="no")
-            cityscapes_prepare = CityscapesPrepare(shift=args.shift, scale=args.scale)
-
-            MixedDatasetsPrepare(synscapes_prepare, cityscapes_prepare).prepare()
+            cityscapes_prepare = CityscapesPrepare(shift="no", scale="no")
+            synscapes_prepare = SynscapesPrepare(shift=args.shift, scale=args.scale)
+            
+            MixedDatasetsPrepare(cityscapes_prepare, synscapes_prepare).prepare()
         else:
             raise ValueError
-            
+
+    print(f"Takes {time.time() - t1} secs")
+    
 
 if __name__ == "__main__":
     main()
+    

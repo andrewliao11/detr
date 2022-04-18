@@ -315,21 +315,14 @@ def build(args):
     if args.dataset.name in ['mscoco14', 'mscoco17']:
         num_classes = 91
     
-    elif args.dataset.name == "kitti":
+    elif args.dataset.name in ["kitti", "virtual_kitti", "mixed_kitti_virtual_kitti"]:
         max_obj_id = 8
         num_classes = max_obj_id + 1
-
-    elif args.dataset.name == "virtual_kitti":
-        max_obj_id = 8
-        num_classes = max_obj_id + 1
-
-    elif args.dataset.name == "synscapes":
+        
+    elif args.dataset.name in ["cityscapes", "synscapes", "mixed_cityscapes_synscapes"]:
         max_obj_id = 33
         num_classes = max_obj_id + 1
         
-    elif args.dataset.name == "cityscapes":
-        max_obj_id = 33
-        num_classes = max_obj_id + 1
     else:
         num_classes = 20 
 

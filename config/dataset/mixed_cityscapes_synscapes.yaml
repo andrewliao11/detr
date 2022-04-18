@@ -1,0 +1,7 @@
+
+# dataset parameters
+name: mixed_cityscapes_synscapes
+path: datasets/mixed_cityscapes_synscapes/coco_format
+panoptic_path: None
+remove_difficult: False
+masks: False

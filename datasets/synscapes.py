@@ -23,12 +23,14 @@ def make_synscapes_transforms(image_set):
     if image_set == 'train':
         return T.Compose([
             T.RandomHorizontalFlip(),
+            T.RandomSizeCropWH(min_size=(1280, 640), max_size=(1440, 720)),
             normalize,
         ])
 
 
     if image_set == 'val':
         return T.Compose([
+            T.RandomSizeCropWH(min_size=(1280, 640), max_size=(1440, 720)),
             normalize,
         ])
 

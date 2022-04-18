@@ -1,6 +1,7 @@
 import os
 import json
 import random
+import imagesize
 import copy
 import pandas as pd
 
@@ -129,14 +130,11 @@ class BaseCOCOPrepare():
             ratio, direction = shift.split("-")
             ratio = float(ratio)
             shift = (ratio, direction)
-            
-            dataset_name += f"_shift-{ratio}-{direction}"
 
         if scale != "no":
             ratio, direction = scale.split("-")
             ratio = float(ratio)
             scale = (ratio, direction)
-            dataset_name += f"_scale-{ratio}-{direction}"
 
         self.shift = shift
         self.scale = scale
@@ -316,7 +314,7 @@ class KittiPrepare(BaseCOCOPrepare):
                 file_name_to_image_info = {}
                 for p in self._image_names[split]:
 
-                    w, h = Image.open(image_root / p).size
+                    w, h = imagesize.get(image_root / p)#Image.open(image_root / p).size
                     img_dict = {
                         "id": image_id,
                         "license": 1,
@@ -473,7 +471,7 @@ class VirtualKittiPrepare(BaseCOCOPrepare):
             
                 for p in self._image_names[split]:
 
-                    w, h = Image.open(image_root / p).size
+                    w, h = imagesize.get(image_root / p)#Image.open(image_root / p).size
                     img_dict = {
                         "id": image_id,
                         "license": 1,
@@ -536,107 +534,6 @@ class VirtualKittiPrepare(BaseCOCOPrepare):
             __construct_annotations_dict(file_name_to_image_info)
             return labels
 
-
-        train_labels = _prepare_labels_split("train")
-        json.dump(train_labels, open(self.target_dataset_root / "train" / "labels.json", "w"))
-
-        val_labels = _prepare_labels_split("val")
-        json.dump(val_labels, open(self.target_dataset_root / "val" / "labels.json", "w"))
-
-
-class MixedKittiVirtualKitti(BaseCOCOPrepare):
-    """Mix Kitti and Virtual Kitti. The train and val splits follow their original splits
-    """
-
-    def __init__(self, kitti, virtual_kitti):
-
-        dataset_name = f"mixed_{kitti.dataset_name}_{virtual_kitti.dataset_name}"
-        super(MixedKittiVirtualKitti, self).__init__(dataset_name, None)
-
-        self.kitti = kitti
-        self.virtual_kitti = virtual_kitti
-        
-        self.kitti.prepare()
-        self.virtual_kitti.prepare()
-
-    def prepare_splits_if_needed(self):
-
-        kitti_splits = json.load((self.kitti.target_dataset_root / "split.json").open())
-        virtual_kitti_splits = json.load((self.virtual_kitti.target_dataset_root / "split.json").open())
-        
-        splits = {
-            "train": [], 
-            "val": []
-        }
-        for split in ["train", "val"]:
-            splits[split].extend([f"{self.kitti.dataset_name}-{v}" for v in kitti_splits[split]])
-            splits[split].extend([f"{self.virtual_kitti.dataset_name}-{v}" for v in virtual_kitti_splits[split]])
-            
-        json.dump(splits, open(self.target_dataset_root / "split.json", "w"))
-        
-    def prepare_images(self):
-
-        split_file = json.load((self.target_dataset_root / "split.json").open())
-
-        image_names = {}
-
-        def _prepare_images_split(split):
-
-            os.makedirs(self.target_dataset_root / split / "data", exist_ok=True)
-            os.chdir(self.target_dataset_root / split / "data")
-            
-            image_names[split] = []
-
-            for p in (self.kitti.target_dataset_root / split / "data").glob("*.png"):
-                tgt_name = f"{self.kitti.dataset_name}-{p.name}"
-                cmd = f"ln -s {p} {tgt_name}"
-                if not Path(tgt_name).exists():
-                    os.system(cmd)
-                image_names[split].append(tgt_name)
-            
-            for p in (self.virtual_kitti.target_dataset_root / split / "data").glob("*.png"):
-                tgt_name = f"{self.virtual_kitti.dataset_name}-{p.name}"
-                cmd = f"ln -s {p} {tgt_name}"
-                if not Path(tgt_name).exists():
-                    os.system(cmd)
-                image_names[split].append(tgt_name)
-                
-        _prepare_images_split("train")
-        _prepare_images_split("val")
-        self._image_names = image_names
-
-    def prepare_labels(self):
-
-        def _prepare_labels_split(split):
-            
-            os.chdir(self.target_dataset_root / split)
-
-            
-            kitti_labels = json.load(open(self.kitti.target_dataset_root / split / "labels.json"))
-            labels = copy.deepcopy(kitti_labels)
-            for img_dict in labels["images"]:
-                name = img_dict["file_name"]
-                img_dict["file_name"] = f"{self.kitti.dataset_name}-{name}"
-
-            # +1 to ensure no overlap
-            image_id_offset = max([i["id"] for i in labels["images"]]) + 1
-
-            virtual_kitti_labels = json.load(open(self.virtual_kitti.target_dataset_root / split / "labels.json"))
-            for img_dict in virtual_kitti_labels["images"]:
-                name = img_dict["file_name"]
-                img_dict["file_name"] = f"{self.virtual_kitti.dataset_name}-{name}"
-                img_dict["id"] = image_id_offset + img_dict["id"]
-
-                labels["images"].append(img_dict)
-
-            # +1 to ensure no overlap
-            anno_id_offset = max([i["id"] for i in labels["annotations"]]) + 1
-            for anno_dict in virtual_kitti_labels["annotations"]:
-                anno_dict["image_id"] = image_id_offset + anno_dict["image_id"]
-                anno_dict["id"] = anno_id_offset + anno_dict["id"]
-                labels["annotations"].append(anno_dict)
-
-            return labels
 
         train_labels = _prepare_labels_split("train")
         json.dump(train_labels, open(self.target_dataset_root / "train" / "labels.json", "w"))
@@ -732,7 +629,7 @@ class SynscapesPrepare(BaseCOCOPrepare):
                 file_name_to_image_info = {}
                 for p in self._image_names[split]:
 
-                    w, h = Image.open(image_root / p).size
+                    w, h = imagesize.get(image_root / p)#Image.open(image_root / p).size
                     img_dict = {
                         "id": image_id,
                         "license": 1,
@@ -751,7 +648,8 @@ class SynscapesPrepare(BaseCOCOPrepare):
                 for anno_p in tqdm(Path(self.dataset_root / "meta").glob("*.json"), desc=f"Process synscape {split}"):
     
                     #orig_p = anno_p.with_suffix(".png")
-                    orig_p = Path(anno_p.replace(".json", "png").replace("meta", "img/rgb"))
+
+                    orig_p = anno_p.parent.parent / "img" / "rgb" / anno_p.with_suffix(".png").name
                     file_name = self._convert_source_path_to_target_name(orig_p)
 
                     if file_name in self._image_names[split]:
@@ -823,7 +721,7 @@ class CityscapesPrepare(BaseCOCOPrepare):
 
     def prepare_images(self):
         
-        image_paths = {
+        image_names = {
             "train": [], 
             "val": []
         }
@@ -838,12 +736,12 @@ class CityscapesPrepare(BaseCOCOPrepare):
                 cmd = f"ln -s {p} {tgt_name}"
                 if not Path(tgt_name).exists():
                     os.system(cmd)
-                image_paths[split].append(tgt_name)
+                image_names[split].append(tgt_name)
 
 
         _prepare_images_split("train")
         _prepare_images_split("val")
-        self._image_paths = image_paths
+        self._image_names = image_names
 
     def prepare_labels(self):
         
@@ -856,7 +754,7 @@ class CityscapesPrepare(BaseCOCOPrepare):
             CRS_S
         )
         
-        assert hasattr(self, "_image_paths"), "Need to call self.prepare_images first"
+        assert hasattr(self, "_image_names"), "Need to call self.prepare_images first"
         
         def _prepare_labels_split(split):
 
@@ -882,9 +780,9 @@ class CityscapesPrepare(BaseCOCOPrepare):
                 image_id = 1
                 file_name_to_image_info= {}
 
-                for p in self._image_paths[split]:
+                for p in self._image_names[split]:
 
-                    w, h = Image.open(image_root / p).size
+                    w, h = imagesize.get(image_root / p)#Image.open(image_root / p).size
                     img_dict = {
                         "id": image_id,
                         "license": 1,
@@ -902,47 +800,50 @@ class CityscapesPrepare(BaseCOCOPrepare):
                 anno_id = 1
                 for anno_p in tqdm(Path(self.dataset_root / f"gtBbox3d/{split}").glob("*/*.json"), desc=f"Processing cityscape {split}"):
 
-                    metadata = json.load(open(anno_p))
-                    
-                    camera = Camera(fx=metadata["sensor"]["fx"],
-                            fy=metadata["sensor"]["fy"],
-                            u0=metadata["sensor"]["u0"],
-                            v0=metadata["sensor"]["v0"],
-                            sensor_T_ISO_8855=metadata["sensor"]["sensor_T_ISO_8855"]
-                    )
 
-                    box3d_annotation = Box3dImageTransform(camera=camera)    
-                    objects_dict = metadata["objects"]
-                        
                     file_name = anno_p.with_suffix(".png").name.replace("gtBbox3d", "leftImg8bit")
-                    image_id, image_w, image_h = file_name_to_image_info[file_name]
+                    if file_name in self._image_names[split]:
+                        metadata = json.load(open(anno_p))
+                        
+                        camera = Camera(fx=metadata["sensor"]["fx"],
+                                fy=metadata["sensor"]["fy"],
+                                u0=metadata["sensor"]["u0"],
+                                v0=metadata["sensor"]["v0"],
+                                sensor_T_ISO_8855=metadata["sensor"]["sensor_T_ISO_8855"]
+                        )
+
+                        box3d_annotation = Box3dImageTransform(camera=camera)    
+                        objects_dict = metadata["objects"]
+                            
+                        
+                        image_id, image_w, image_h = file_name_to_image_info[file_name]
+                        
+                        for obj_dict in objects_dict:
+                            obj = CsBbox3d()
+                            obj.fromJsonText(obj_dict)
+
+                            
+                            x_top_left, y_top_left, x_bottom_right, y_bottom_right = obj.bbox_2d.bbox_modal
+                            bbox_width = x_bottom_right - x_top_left
+                            bbox_height = y_bottom_right - y_top_left
+                            
+                            bbox = [x_top_left, y_top_left, bbox_width, bbox_height]
+                            bbox = self.shift_or_scale_bbox(bbox, image_w, image_h)
+                            
+                            new_anno_dict = {
+                                "id": anno_id, 
+                                "image_id": image_id, 
+                                "bbox": bbox, 
+                                "category_id": class_name_to_id[obj_dict["label"]], 
+                                "occluded": obj_dict["occlusion"], 
+                                "truncated": obj_dict["truncation"], 
+                                "iscrowd": 0, 
+                                "area": bbox_width*bbox_height
+                            }
+
+                            labels["annotations"].append(new_anno_dict)
+                            anno_id += 1
                     
-                    for obj_dict in objects_dict:
-                        obj = CsBbox3d()
-                        obj.fromJsonText(obj_dict)
-
-                        
-                        x_top_left, y_top_left, x_bottom_right, y_bottom_right = obj.bbox_2d.bbox_modal
-                        bbox_width = x_bottom_right - x_top_left
-                        bbox_height = y_bottom_right - y_top_left
-                        
-                        bbox = [x_top_left, y_top_left, bbox_width, bbox_height]
-                        bbox = self.shift_or_scale_bbox(bbox, image_w, image_h)
-                        
-                        new_anno_dict = {
-                            "id": anno_id, 
-                            "image_id": image_id, 
-                            "bbox": bbox, 
-                            "category_id": class_name_to_id[obj_dict["label"]], 
-                            "occluded": obj_dict["occlusion"], 
-                            "truncated": obj_dict["truncation"], 
-                            "iscrowd": 0, 
-                            "area": bbox_width*bbox_height
-                        }
-
-                        labels["annotations"].append(new_anno_dict)
-                        anno_id += 1
-                
             file_name_to_image_info = __construct_image_dict()
             __construct_annotations_dict(file_name_to_image_info)
             return labels
@@ -962,27 +863,32 @@ class MixedDatasetsPrepare(BaseCOCOPrepare):
     def __init__(self, datasetA, datasetB):
 
         dataset_name = f"mixed_{datasetA.dataset_name}_{datasetB.dataset_name}"
-        super(MixedDatasetsPrepare(datasetA, datasetB), self).__init__(dataset_name, None)
+        super(MixedDatasetsPrepare, self).__init__(dataset_name, None)
 
         self.datasetA = datasetA
         self.datasetB = datasetB
         
+        print(f"Prepare {datasetA.dataset_name}")
         self.datasetA.prepare()
+        print(f"Prepare {datasetB.dataset_name}")
         self.datasetB.prepare()
 
     def prepare_splits_if_needed(self):
 
-        datasetA_splits = json.load((self.datasetA.target_dataset_root / "split.json").open())
-        datasetB_splits = json.load((self.datasetB.target_dataset_root / "split.json").open())
-        
         splits = {
             "train": [], 
             "val": []
         }
-        for split in ["train", "val"]:
-            splits[split].extend([f"{self.datasetA.dataset_name}-{v}" for v in datasetA_splits[split]])
-            splits[split].extend([f"{self.datasetB.dataset_name}-{v}" for v in datasetB_splits[split]])
-            
+
+        def _prepare_split(split):
+            for p in (self.datasetA.target_dataset_root / split / "data").glob("*.png"):
+                splits[split].append(f"{p.name}")
+
+            for p in (self.datasetB.target_dataset_root / split / "data").glob("*.png"):
+                splits[split].append(p.name)
+
+        _prepare_split("train")
+        _prepare_split("val")
         json.dump(splits, open(self.target_dataset_root / "split.json", "w"))
         
     def prepare_images(self):
@@ -1042,7 +948,7 @@ class MixedDatasetsPrepare(BaseCOCOPrepare):
 
             # +1 to ensure no overlap
             anno_id_offset = max([i["id"] for i in labels["annotations"]]) + 1
-            for anno_dict in virtual_kitti_labels["annotations"]:
+            for anno_dict in datasetB_labels["annotations"]:
                 anno_dict["image_id"] = image_id_offset + anno_dict["image_id"]
                 anno_dict["id"] = anno_id_offset + anno_dict["id"]
                 labels["annotations"].append(anno_dict)
