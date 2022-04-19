@@ -5,6 +5,7 @@ import imagesize
 import copy
 import pandas as pd
 
+from itertools import chain
 from tqdm import tqdm
 from PIL import Image
 from pathlib import Path
@@ -544,6 +545,10 @@ class VirtualKittiPrepare(BaseCOCOPrepare):
 
 class SynscapesPrepare(BaseCOCOPrepare):
 
+    # person, car, truck, train, bicycle, bus, motocycle
+    #INTERESTING_CLASSES = [24, 26, 27, 31, 33, 28, 32]
+    INTERESTING_CLASSES = [26, 27, 31, 33, 28, 32]
+
     def __init__(self, shift, scale, train_ratio=0.7, image_prefix=""):
 
         dataset_name = "synscapes"
@@ -646,8 +651,6 @@ class SynscapesPrepare(BaseCOCOPrepare):
                 
                 anno_id = 1
                 for anno_p in tqdm(Path(self.dataset_root / "meta").glob("*.json"), desc=f"Process synscape {split}"):
-    
-                    #orig_p = anno_p.with_suffix(".png")
 
                     orig_p = anno_p.parent.parent / "img" / "rgb" / anno_p.with_suffix(".png").name
                     file_name = self._convert_source_path_to_target_name(orig_p)
@@ -663,8 +666,9 @@ class SynscapesPrepare(BaseCOCOPrepare):
                         truncated_dict = metadata["instance"]["truncated"]
 
                         for instance_id in bbox2d_dict.keys():
-
-                            if class_dict[instance_id] != -1:
+                            
+                            category_id = class_dict[instance_id]
+                            if category_id != -1 and category_id in self.INTERESTING_CLASSES:
                                 
                                 x_top_left = bbox2d_dict[instance_id]["xmin"] * image_w
                                 y_top_left = bbox2d_dict[instance_id]["ymin"] * image_h
@@ -678,7 +682,7 @@ class SynscapesPrepare(BaseCOCOPrepare):
                                     "id": anno_id, 
                                     "image_id": image_id, 
                                     "bbox": bbox, 
-                                    "category_id": class_dict[instance_id], 
+                                    "category_id": category_id, 
                                     "occluded": occluded_dict[instance_id], 
                                     "truncated": truncated_dict[instance_id], 
                                     "iscrowd": 0, 
@@ -698,8 +702,12 @@ class SynscapesPrepare(BaseCOCOPrepare):
         val_labels = _prepare_labels_split("val")
         json.dump(val_labels, open(self.target_dataset_root / "val" / "labels.json", "w"))
 
-        
+
 class CityscapesPrepare(BaseCOCOPrepare):
+
+    # person, car, truck, train, bicycle, bus, motocycle
+    #INTERESTING_CLASSES = [24, 26, 27, 31, 33, 28, 32]
+    INTERESTING_CLASSES = [26, 27, 31, 33, 28, 32]
 
     def __init__(self, shift, scale, image_prefix=""):
 
@@ -798,10 +806,43 @@ class CityscapesPrepare(BaseCOCOPrepare):
 
             def __construct_annotations_dict(file_name_to_image_info):
                 anno_id = 1
+
+                for anno_p in tqdm(Path(self.dataset_root / f"gtBboxCityPersons/{split}").glob("*/*.json"), desc=f"Processing cityscape {split}"):
+                    file_name = anno_p.with_suffix(".png").name.replace("gtBboxCityPersons", "leftImg8bit")
+                    if file_name in self._image_names[split]:
+                        metadata = json.load(open(anno_p))
+                        image_id, image_w, image_h = file_name_to_image_info[file_name]
+                        objects_dict = metadata["objects"]
+
+                        for obj_dict in objects_dict:
+
+                            category_id = 24
+                            if category_id in self.INTERESTING_CLASSES:
+
+                                x_top_left, y_top_left, bbox_width, bbox_height = obj_dict["bbox"]
+                                
+                                bbox = [x_top_left, y_top_left, bbox_width, bbox_height]
+                                bbox = self.shift_or_scale_bbox(bbox, image_w, image_h)
+                                
+                                new_anno_dict = {
+                                    "id": anno_id, 
+                                    "image_id": image_id, 
+                                    "bbox": bbox, 
+                                    "category_id": category_id, 
+                                    "occluded": 0., 
+                                    "truncated": 0.,        # Ignored
+                                    "iscrowd": 0,           # Ignored
+                                    "area": bbox_width*bbox_height
+                                }
+
+                                labels["annotations"].append(new_anno_dict)
+                                anno_id += 1
+
                 for anno_p in tqdm(Path(self.dataset_root / f"gtBbox3d/{split}").glob("*/*.json"), desc=f"Processing cityscape {split}"):
-
-
+                
+                        
                     file_name = anno_p.with_suffix(".png").name.replace("gtBbox3d", "leftImg8bit")
+
                     if file_name in self._image_names[split]:
                         metadata = json.load(open(anno_p))
                         
@@ -822,27 +863,29 @@ class CityscapesPrepare(BaseCOCOPrepare):
                             obj = CsBbox3d()
                             obj.fromJsonText(obj_dict)
 
-                            
-                            x_top_left, y_top_left, x_bottom_right, y_bottom_right = obj.bbox_2d.bbox_modal
-                            bbox_width = x_bottom_right - x_top_left
-                            bbox_height = y_bottom_right - y_top_left
-                            
-                            bbox = [x_top_left, y_top_left, bbox_width, bbox_height]
-                            bbox = self.shift_or_scale_bbox(bbox, image_w, image_h)
-                            
-                            new_anno_dict = {
-                                "id": anno_id, 
-                                "image_id": image_id, 
-                                "bbox": bbox, 
-                                "category_id": class_name_to_id[obj_dict["label"]], 
-                                "occluded": obj_dict["occlusion"], 
-                                "truncated": obj_dict["truncation"], 
-                                "iscrowd": 0, 
-                                "area": bbox_width*bbox_height
-                            }
+                            category_id = class_name_to_id[obj_dict["label"]]
+                            if category_id in self.INTERESTING_CLASSES:
 
-                            labels["annotations"].append(new_anno_dict)
-                            anno_id += 1
+                                x_top_left, y_top_left, x_bottom_right, y_bottom_right = obj.bbox_2d.bbox_modal
+                                bbox_width = x_bottom_right - x_top_left
+                                bbox_height = y_bottom_right - y_top_left
+                                
+                                bbox = [x_top_left, y_top_left, bbox_width, bbox_height]
+                                bbox = self.shift_or_scale_bbox(bbox, image_w, image_h)
+                                
+                                new_anno_dict = {
+                                    "id": anno_id, 
+                                    "image_id": image_id, 
+                                    "bbox": bbox, 
+                                    "category_id": category_id, 
+                                    "occluded": obj_dict["occlusion"], 
+                                    "truncated": obj_dict["truncation"], 
+                                    "iscrowd": 0, 
+                                    "area": bbox_width*bbox_height
+                                }
+
+                                labels["annotations"].append(new_anno_dict)
+                                anno_id += 1
                     
             file_name_to_image_info = __construct_image_dict()
             __construct_annotations_dict(file_name_to_image_info)

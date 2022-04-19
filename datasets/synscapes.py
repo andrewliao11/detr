@@ -41,13 +41,7 @@ def build(image_set, dataset_args, given_class_mapping=None):
     root = os.environ['HOME'] / Path(dataset_args.path)
 
     assert root.exists(), f'provided synscapes path {root} does not exist'
-    dataset = CocoDetection(root / "data", root / "labels.json", transforms=make_synscapes_transforms(image_set), return_masks=False, given_class_mapping=given_class_mapping)
-    train_ratio = 0.7
-
-    n_train = int(len(dataset)*train_ratio)
-    lengths = [n_train, len(dataset) - n_train]
-    train_dataset, val_dataset = random_split(dataset, lengths, generator=torch.Generator().manual_seed(42))
-    if image_set == "train":
-        return train_dataset
-    elif image_set == "val":
-        return val_dataset
+    dataset = CocoDetection(root / image_set / "data", root / image_set / "labels.json", transforms=make_synscapes_transforms(image_set), return_masks=False, given_class_mapping=given_class_mapping)
+    
+    return dataset
+    

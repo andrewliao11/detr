@@ -41,7 +41,7 @@ def build(image_set, dataset_args, given_class_mapping=None):
     root = os.environ['HOME'] / Path(dataset_args.path)
 
     assert root.exists(), f'provided cityscapes path {root} does not exist'
-    dataset = CocoDetection(root / f"{image_set}/data", root / f"{image_set}/labels.json", 
+    dataset = CocoDetection(root / image_set / "data", root / image_set / "labels.json", 
                             transforms=make_cityscapes_transforms(image_set), return_masks=False, given_class_mapping=given_class_mapping)
     
     return dataset
