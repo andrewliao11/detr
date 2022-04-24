@@ -20,7 +20,7 @@ def main():
 
     args = parser.parse_args()
 
-    os.chdir("../datasets_preparation")
+    os.chdir("datasets_preparation")
     cmd = f"python prepare.py --datasets {args.dataset}"
     if args.shift != "no":
         cmd = f"{cmd} --shift {args.shift}"
@@ -35,7 +35,7 @@ def main():
     print(cmd)
     os.system(cmd)
     
-    os.chdir("../")
+    os.chdir("../../")
 
     dataset_path = args.dataset
     if args.shift != "no":

@@ -1,0 +1,7 @@
+
+# dataset parameters
+name: cityscapes_car
+path: datasets/cityscapes_car/coco_format
+panoptic_path: None
+remove_difficult: False
+masks: False

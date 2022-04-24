@@ -319,7 +319,7 @@ def build(args):
         max_obj_id = 8
         num_classes = max_obj_id + 1
         
-    elif args.dataset.name in ["cityscapes", "synscapes", "mixed_cityscapes_synscapes"]:
+    elif args.dataset.name in ["cityscapes_car", "synscapes_car", "mixed_cityscapes_car_synscapes_car"]:
         max_obj_id = 33
         num_classes = max_obj_id + 1
         

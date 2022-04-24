@@ -2,7 +2,7 @@ import os
 import time
 import argparse
 from pathlib import Path
-from prepare_fn import Mscoco14Prepare, Mscoco17Prepare, KittiPrepare, VirtualKittiPrepare, SynscapesPrepare, CityscapesPrepare, MixedDatasetsPrepare
+from datasets import *
 
 def main():
 
@@ -20,40 +20,44 @@ def main():
         if name == "mscoco14":
             assert args.shift == "no"
             assert args.scale == "no"
-
             Mscoco14Prepare().prepare()
+
         elif name == "mscoco17":
             assert args.shift == "no"
             assert args.scale == "no"
-
             Mscoco17Prepare().prepare()
+
         elif name == "kitti":
             KittiPrepare(shift=args.shift, scale=args.scale).prepare()
+
         elif name == "virtual_kitti":
             VirtualKittiPrepare(shift=args.shift, scale=args.scale).prepare()
-        elif name == "synscapes":
-            SynscapesPrepare(shift=args.shift, scale=args.scale).prepare()
-        elif name == "cityscapes":
-            CityscapesPrepare(shift=args.shift, scale=args.scale).prepare()
+
         elif name == "mixed_kitti_virtual_kitti":
             kitti_prepare = KittiPrepare(shift="no", scale="no")
             virtual_kitti_prepare = VirtualKittiPrepare(shift=args.shift, scale=args.scale)
-
             MixedDatasetsPrepare(kitti_prepare, virtual_kitti_prepare).prepare()
+
         elif name == "10to1_mixed_kitti_virtual_kitti":
             kitti_prepare = KittiPrepare(train_ratio=0.1, shift="no", scale="no")
             virtual_kitti_prepare = VirtualKittiPrepare(shift=args.shift, scale=args.scale)
-
             MixedDatasetsPrepare(kitti_prepare, virtual_kitti_prepare).prepare()
-        elif name == "mixed_cityscapes_synscapes":
-            cityscapes_prepare = CityscapesPrepare(shift="no", scale="no")
-            synscapes_prepare = SynscapesPrepare(shift=args.shift, scale=args.scale)
-            
-            MixedDatasetsPrepare(cityscapes_prepare, synscapes_prepare).prepare()
+
+        elif name == "synscapes_car":
+            SynscapesCarPrepare(shift=args.shift, scale=args.scale).prepare()
+
+        elif name == "cityscapes_car":
+            CityscapesCarPrepare(shift=args.shift, scale=args.scale).prepare()
+
+        elif name == "mixed_cityscapes_car_synscapes_car":
+            cityscapes_car_prepare = CityscapesCarPrepare(shift="no", scale="no")
+            synscapes_car_prepare = SynscapesCarPrepare(shift=args.shift, scale=args.scale)
+            MixedDatasetsPrepare(cityscapes_car_prepare, synscapes_car_prepare).prepare()
+
         else:
             raise ValueError
 
-    print(f"Takes {time.time() - t1} secs")
+    print(f"Takes {(time.time() - t1) / 60} min(s)")
     
 
 if __name__ == "__main__":
